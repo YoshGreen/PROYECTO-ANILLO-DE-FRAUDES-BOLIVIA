@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Listas Negras en Redis - Yape{% endblock %}
+
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col-md-8">
+        <h2 class="fw-bold mb-1"><i class="fa-solid fa-ban text-danger me-2"></i>Estructuras Clave-Valor en Memoria (Redis)</h2>
+        <p class="text-muted mb-0">Conjuntos <em>Set</em> (complejidad $O(1)$) y cadenas volátiles con TTL implementadas en Redis local (<code>localhost:6379</code>).</p>
+    </div>
+    <div class="col-md-4 text-md-end mt-3 mt-md-0">
+        <button class="btn btn-outline-primary btn-sm" onclick="rehidratarRedis()">
+            <i class="fa-solid fa-arrows-rotate me-1"></i> Sincronizar desde MongoDB
+        </button>
+    </div>
+</div>
+
+<!-- Contadores de Velocidad Activos (TTL 60s) -->
+<div class="card card-metric p-4 bg-white mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="fw-bold mb-0">
+            <i class="fa-solid fa-gauge-high text-primary me-2"></i>Contadores de Velocidad Activos (<code>velocity:tx:*</code>)
+        </h5>
+        <span class="badge bg-primary rounded-pill">{{ velocidades|length }} activas en los últimos 60s</span>
+    </div>
+    <p class="text-muted small">Claves de cadena entera con TTL de 60 segundos creadas por <code>INCR + EXPIRE ... NX</code> en cada transferencia. Si el contador supera 5 tx/min, la transacción se aborta de inmediato.</p>
+
+    {% if velocidades %}
+    <div class="table-responsive">
+        <table class="table table-sm table-custom table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Clave en Redis</th>
+                    <th>Titular de la Cuenta</th>
+                    <th>Transacciones en 60s</th>
+                    <th>TTL Restante</th>
+                    <th>Estado de Riesgo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in velocidades %}
+                <tr>
+                    <td><code>{{ v.clave }}</code></td>
+                    <td class="fw-bold">{{ v.nombre }} <small class="text-muted">({{ v.usuario_id }})</small></td>
+                    <td>
+                        <span class="badge {% if v.contador|int > 5 %}bg-danger{% else %}bg-info text-dark{% endif %} fs-6">
+                            {{ v.contador }} tx
+                        </span>
+                    </td>
+                    <td><span class="badge bg-light text-dark border">{{ v.ttl_restante }} segundos</span></td>
+                    <td>
+                        {% if v.contador|int > 5 %}
+                            <span class="badge bg-danger">Bloqueo por Ráfaga Activo</span>
+                        {% else %}
+                            <span class="badge bg-success">Dentro de Límites</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <div class="p-3 bg-light rounded text-center text-muted small">
+            No hay contadores de velocidad activos actualmente. (Se generan cuando realizas pagos en el <a href="{{ url_for('transferir') }}">Simulador de Transferencias</a> y expiran automáticamente a los 60 segundos).
+        </div>
+    {% endif %}
+</div>
+
+<!-- Tres Conjuntos Set de Listas Negras O(1) -->
+<div class="row g-4">
+    <!-- blacklist:users -->
+    <div class="col-lg-4">
+        <div class="card card-metric p-3 bg-white h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold mb-0"><i class="fa-solid fa-user-slash text-danger me-1"></i> <code>blacklist:users</code></h6>
+                <span class="badge bg-danger">{{ users|length }}</span>
+            </div>
+            <p class="text-muted small">Identificadores <code>ObjectId</code> de cuentas suspendidas o confirmadas en anillos.</p>
+
+            <div class="list-group list-group-flush small" style="max-height: 380px; overflow-y: auto;">
+                {% for u in users %}
+                <div class="list-group-item px-2 py-2 d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">{{ users_info[u].nombre_completo if u in users_info else 'Cuenta Bloqueada' }}</div>
+                        <code class="text-muted small">{{ u }}</code>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary p-1" onclick="desbloquearUsuario('{{ u }}')" title="Desbloquear">
+                        <i class="fa-solid fa-trash-can text-danger"></i>
+                    </button>
+                </div>
+                {% else %}
+                <div class="text-center py-3 text-muted">Sin usuarios bloqueados.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- blacklist:devices -->
+    <div class="col-lg-4">
+        <div class="card card-metric p-3 bg-white h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold mb-0"><i class="fa-solid fa-mobile-screen text-danger me-1"></i> <code>blacklist:devices</code></h6>
+                <span class="badge bg-danger">{{ devices|length }}</span>
+            </div>
+            <p class="text-muted small">Identificadores de hardware únicos bloqueados. Impide pagos desde celulares de estafadores.</p>
+
+            <div class="list-group list-group-flush small" style="max-height: 380px; overflow-y: auto;">
+                {% for d in devices %}
+                <div class="list-group-item px-2 py-2 d-flex justify-content-between align-items-center">
+                    <code>{{ d }}</code>
+                    <span class="badge bg-light text-danger border">Bloqueado</span>
+                </div>
+                {% else %}
+                <div class="text-center py-3 text-muted">Sin dispositivos bloqueados.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- blacklist:phones -->
+    <div class="col-lg-4">
+        <div class="card card-metric p-3 bg-white h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold mb-0"><i class="fa-solid fa-phone-slash text-danger me-1"></i> <code>blacklist:phones</code></h6>
+                <span class="badge bg-danger">{{ phones|length }}</span>
+            </div>
+            <p class="text-muted small">Líneas telefónicas reportadas por fraude o vinculadas a cuentas fantasma.</p>
+
+            <div class="list-group list-group-flush small" style="max-height: 380px; overflow-y: auto;">
+                {% for p in phones %}
+                <div class="list-group-item px-2 py-2 d-flex justify-content-between align-items-center">
+                    <code>{{ p }}</code>
+                    <span class="badge bg-light text-danger border">Bloqueado</span>
+                </div>
+                {% else %}
+                <div class="text-center py-3 text-muted">Sin teléfonos bloqueados.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard General - Antifraude Yape{% endblock %}
+
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col-md-8">
+        <h2 class="fw-bold mb-1"><i class="fa-solid fa-gauge-high text-primary me-2"></i>Centro de Control Antifraude</h2>
+        <p class="text-muted mb-0">Arquitectura NoSQL políglota: MongoDB (consistencia y grafos) + Redis (evaluación de latencia sub-50ms).</p>
+    </div>
+    <div class="col-md-4 text-md-end mt-3 mt-md-0">
+        <button class="btn btn-outline-primary btn-sm me-2" onclick="rehidratarRedis()">
+            <i class="fa-solid fa-arrows-rotate me-1"></i> Rehidratar Redis
+        </button>
+        <a href="{{ url_for('transferir') }}" class="btn btn-yape btn-sm">
+            <i class="fa-solid fa-bolt me-1"></i> Probar Transferencia
+        </a>
+    </div>
+</div>
+
+<!-- Tarjetas de Métricas -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card card-metric p-3 bg-white h-100">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small text-uppercase fw-bold">Usuarios Totales</span>
+                    <h3 class="fw-bold my-1">{{ total_usuarios }}</h3>
+                    <span class="badge bg-light text-muted border">MongoDB: usuarios</span>
+                </div>
+                <div class="metric-icon-box icon-purple">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card card-metric p-3 bg-white h-100">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small text-uppercase fw-bold">Transacciones</span>
+                    <h3 class="fw-bold my-1">{{ total_tx }}</h3>
+                    <span class="badge bg-light text-muted border">Inmutables (WriteConcern)</span>
+                </div>
+                <div class="metric-icon-box icon-cyan">
+                    <i class="fa-solid fa-receipt"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card card-metric p-3 bg-white h-100">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small text-uppercase fw-bold">Aristas de Flujo</span>
+                    <h3 class="fw-bold my-1">{{ total_aristas }}</h3>
+                    <span class="badge bg-light text-muted border">Proyección ($merge)</span>
+                </div>
+                <div class="metric-icon-box icon-purple">
+                    <i class="fa-solid fa-share-nodes"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card card-metric p-3 bg-white h-100">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-muted small text-uppercase fw-bold">Alertas Pendientes</span>
+                    <h3 class="fw-bold my-1 text-danger">{{ alertas_pendientes }}</h3>
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle">{{ cuentas_bloqueadas }} bloqueadas</span>
+                </div>
+                <div class="metric-icon-box icon-danger">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Estado de Redis en Memoria y Arquitectura Políglota -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card card-metric p-3 bg-white h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0"><i class="fa-solid fa-bolt text-danger me-2"></i>Redis: Estado de Listas Negras $O(1)$</h5>
+                <span class="badge bg-danger text-white">En Memoria</span>
+            </div>
+            <p class="text-muted small">Estructuras clave-valor en RAM utilizadas por el <code>ServicioEvaluadorRiesgo</code> para validar listas negras en submilisegundos antes de autorizar cualquier transacción.</p>
+            
+            <div class="row text-center g-2 mt-2">
+                <div class="col-4">
+                    <div class="p-3 bg-light rounded-3 border">
+                        <small class="text-muted d-block text-uppercase fw-bold">Usuarios</small>
+                        <h4 class="fw-bold text-dark my-1">{{ redis_users }}</h4>
+                        <code class="small text-muted">blacklist:users</code>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="p-3 bg-light rounded-3 border">
+                        <small class="text-muted d-block text-uppercase fw-bold">Dispositivos</small>
+                        <h4 class="fw-bold text-dark my-1">{{ redis_devices }}</h4>
+                        <code class="small text-muted">blacklist:devices</code>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="p-3 bg-light rounded-3 border">
+                        <small class="text-muted d-block text-uppercase fw-bold">Teléfonos</small>
+                        <h4 class="fw-bold text-dark my-1">{{ redis_phones }}</h4>
+                        <code class="small text-muted">blacklist:phones</code>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3 text-end">
+                <a href="{{ url_for('listas_negras') }}" class="btn btn-sm btn-outline-secondary">
+                    Ver claves y TTLs en Redis <i class="fa-solid fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card card-metric p-3 bg-white h-100">
+            <h5 class="fw-bold mb-2"><i class="fa-solid fa-shield-virus text-warning me-2"></i>Sembrado de Fraude (Verdad de Referencia)</h5>
+            <p class="text-muted small">El simulador local contiene patrones de fraude inyectados con tamaño conocido para verificar la efectividad de las consultas:</p>
+            <ul class="list-group list-group-flush small">
+                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                    <div>
+                        <i class="fa-solid fa-circle-notch text-danger me-2"></i>
+                        <strong>5 Anillos de Fraude Circulares:</strong>
+                        <span class="text-muted">Ciclos cerrados de 3, 3, 4, 4 y 5 cuentas (19 cuentas en total).</span>
+                    </div>
+                    <span class="badge bg-danger rounded-pill">19 cuentas</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                    <div>
+                        <i class="fa-solid fa-mobile-screen text-warning me-2"></i>
+                        <strong>Dispositivos Compartidos (Cuentas Fantasma):</strong>
+                        <span class="text-muted">Equipos <code>DEV-SHARED-00</code> a <code>04</code> con múltiples cuentas.</span>
+                    </div>
+                    <span class="badge bg-warning text-dark rounded-pill">5 equipos</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                    <div>
+                        <i class="fa-solid fa-gauge text-primary me-2"></i>
+                        <strong>Control de Velocidad Transaccional:</strong>
+                        <span class="text-muted">Ventana fija de 60s con máx. 5 tx/min (bloqueo automático).</span>
+                    </div>
+                    <span class="badge bg-primary rounded-pill">TTL 60s</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Últimas Transacciones Registradas -->
+<div class="card card-metric p-3 bg-white mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0"><i class="fa-solid fa-clock-rotate-left text-primary me-2"></i>Transacciones Recientes en MongoDB</h5>
+        <a href="{{ url_for('transferir') }}" class="btn btn-sm btn-yape">
+            <i class="fa-solid fa-plus me-1"></i> Nueva Transacción
+        </a>
+    </div>
+
+    {% if ultimas_tx %}
+    <div class="table-responsive">
+        <table class="table table-custom table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Emisor</th>
+                    <th>Receptor</th>
+                    <th>Monto</th>
+                    <th>Dispositivo Origen</th>
+                    <th>Estado</th>
+                    <th>Riesgo</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in ultimas_tx %}
+                <tr>
+                    <td><code class="fw-bold">{{ tx.codigo_transaccion }}</code></td>
+                    <td>
+                        <div class="fw-bold">{{ tx.emisor.nombre }}</div>
+                        <small class="text-muted">{{ tx.emisor.telefono }}</small>
+                    </td>
+                    <td>
+                        <div class="fw-bold">{{ tx.receptor.nombre }}</div>
+                        <small class="text-muted">{{ tx.receptor.telefono }}</small>
+                    </td>
+                    <td class="fw-bold text-dark">Bs. {{ "%.2f"|format(tx.monto) }}</td>
+                    <td><span class="badge bg-light text-dark border">{{ tx.emisor.device_id_origen }}</span></td>
+                    <td>
+                        {% if tx.estado == 'COMPLETADA' %}
+                            <span class="badge badge-completada"><i class="fa-solid fa-check me-1"></i>Completada</span>
+                        {% else %}
+                            <span class="badge badge-rechazada"><i class="fa-solid fa-xmark me-1"></i>Rechazada ({{ tx.motivo_decision or 'Fraude' }})</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="small fw-bold">{{ tx.riesgo_calculado }}/100</span>
+                        </div>
+                    </td>
+                    <td class="small text-muted">{{ tx.fecha_hora.strftime('%H:%M:%S - %d/%m/%Y') if tx.fecha_hora else '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <div class="text-center py-4 text-muted">
+            <i class="fa-solid fa-database fa-2x mb-2 text-secondary"></i>
+            <p>No hay transacciones registradas. Haz clic en <strong>"Sembrar Datos"</strong> arriba para generar datos de prueba.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

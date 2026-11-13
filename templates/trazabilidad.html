@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Trazabilidad de la Ruta del Dinero - Yape{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="fw-bold mb-1"><i class="fa-solid fa-route text-primary me-2"></i>Rastreo de la Ruta del Dinero</h2>
+        <p class="text-muted">Escenario 7: Reconstrucción forense del camino de transferencias entre dos cuentas mediante recorridos en grafo con <code>$graphLookup</code>.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Selector de Cuentas A y B -->
+    <div class="col-lg-5">
+        <div class="card card-metric p-4 bg-white">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-magnifying-glass-dollar text-purple me-2"></i>Buscar Flujo de Fondos</h5>
+            
+            <form id="formRuta" onsubmit="buscarRuta(event)">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Cuenta de Origen (A):</label>
+                    <select id="selectRutaA" class="form-select font-mono small" required>
+                        <option value="" disabled selected>-- Seleccione cuenta origen --</option>
+                        {% for u in usuarios %}
+                        <option value="{{ u._id }}">{{ u.nombre_completo }} ({{ u.telefono_principal }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Cuenta de Destino (B):</label>
+                    <select id="selectRutaB" class="form-select font-mono small" required>
+                        <option value="" disabled selected>-- Seleccione cuenta destino --</option>
+                        {% for u in usuarios %}
+                        <option value="{{ u._id }}">{{ u.nombre_completo }} ({{ u.telefono_principal }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-yape w-100 py-2 fw-bold" id="btnBuscarRuta">
+                    <i class="fa-solid fa-route me-1"></i> Rastrear Ruta con $graphLookup
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Resultados de la Trazabilidad -->
+    <div class="col-lg-7">
+        <div class="card card-metric p-4 bg-white h-100">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-timeline text-primary me-2"></i>Cadena de Transferencias Encontrada</h5>
+            
+            <div id="resultadoRuta" class="p-3 bg-light rounded-3 border text-center text-muted">
+                <i class="fa-solid fa-arrows-split-up-and-left fa-3x text-secondary mb-2"></i>
+                <p class="mb-0">Selecciona dos usuarios a la izquierda para rastrear transferencias directas o a través de intermediarios (cuentas puente o mulas).</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function buscarRuta(e) {
+    e.preventDefault();
+    const btn = document.getElementById("btnBuscarRuta");
+    const a = document.getElementById("selectRutaA").value;
+    const b = document.getElementById("selectRutaB").value;
+    const resBox = document.getElementById("resultadoRuta");
+
+    if (a === b) {
+        alert("Selecciona dos cuentas distintas.");
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Ejecutando $graphLookup...`;
+    resBox.innerHTML = `<div class="py-4"><div class="spinner-border text-primary me-2"></div> Rastreando saltos en aristas_flujo...</div>`;
+
+    try {
+        const resp = await fetch("/api/ruta-dinero", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id_emisor: a, id_receptor: b })
+        });
+        const data = await resp.json();
+
+        if (data.ok && data.rutas && data.rutas.length > 0) {
+            let html = `<div class="alert alert-success fw-bold"><i class="fa-solid fa-check me-1"></i> Se encontraron ${data.rutas.length} caminos de flujo de fondos:</div>`;
+
+            data.rutas.forEach((r, idx) => {
+                html += `
+                    <div class="card border mb-3 text-start">
+                        <div class="card-header bg-white py-2 fw-bold text-dark">
+                            Ruta #${idx+1}: ${r.emisor} &rarr; ${r.receptor} (Monto inicial: Bs. ${r.monto})
+                        </div>
+                        <div class="card-body p-3">
+                            <small class="text-muted text-uppercase fw-bold d-block mb-2">Saltos registrados en el grafo:</small>
+                            <ul class="list-group list-group-flush small">
+                `;
+
+                if (r.saltos.length === 0) {
+                    html += `<li class="list-group-item">Transferencia directa entre emisor y receptor (1 salto).</li>`;
+                } else {
+                    r.saltos.forEach(s => {
+                        html += `
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="badge bg-secondary me-1">Nivel ${s.nivel}</span>
+                                    <strong>${s.desde}</strong> &rarr; <strong>${s.hacia}</strong>
+                                </div>
+                                <span class="badge bg-light text-dark border">Bs. ${s.monto}</span>
+                            </li>
+                        `;
+                    });
+                }
+
+                html += `</ul></div></div>`;
+            });
+
+            resBox.innerHTML = html;
+        } else {
+            resBox.innerHTML = `
+                <div class="alert alert-warning text-start">
+                    <i class="fa-solid fa-circle-exclamation me-1"></i>
+                    <strong>No se encontró ruta de dinero directa o indirecta</strong> entre estas dos cuentas dentro del límite de 5 saltos.
+                </div>
+            `;
+        }
+    } catch (err) {
+        resBox.innerHTML = `<div class="alert alert-danger">Error: ${err}</div>`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-route me-1"></i> Rastrear Ruta con $graphLookup`;
+    }
+}
+</script>
+{% endblock %}

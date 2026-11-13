@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Antifraude Yape Bolivia{% endblock %} - Base de Datos III</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Vis.js Network for interactive graphs -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-light">
+
+    <!-- Top Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark yape-navbar sticky-top shadow-sm">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="{{ url_for('index') }}">
+                <span class="yape-logo-badge"><i class="fa-solid fa-shield-halved"></i></span>
+                <div>
+                    <span class="text-white fs-5">Yape Bolivia</span>
+                    <span class="badge bg-cyan text-dark ms-1 small">Antifraude NoSQL</span>
+                </div>
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-3">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{{ url_for('index') }}">
+                            <i class="fa-solid fa-chart-pie me-1"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/transferir' %}active{% endif %}" href="{{ url_for('transferir') }}">
+                            <i class="fa-solid fa-money-bill-transfer me-1"></i> Simulador Tx
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/anillos' %}active{% endif %}" href="{{ url_for('anillos') }}">
+                            <i class="fa-solid fa-circle-nodes me-1"></i> Anillos ($graphLookup)
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/cuentas-fantasma' %}active{% endif %}" href="{{ url_for('cuentas_fantasma') }}">
+                            <i class="fa-solid fa-mobile-screen-button me-1"></i> Dispositivos Compartidos
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/alertas' %}active{% endif %}" href="{{ url_for('alertas') }}">
+                            <i class="fa-solid fa-bell me-1"></i> Alertas
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/listas-negras' %}active{% endif %}" href="{{ url_for('listas_negras') }}">
+                            <i class="fa-solid fa-ban me-1"></i> Redis Blacklist
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/trazabilidad' %}active{% endif %}" href="{{ url_for('trazabilidad') }}">
+                            <i class="fa-solid fa-route me-1"></i> Ruta del Dinero
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-warning {% if request.path == '/compass-info' %}active{% endif %}" href="{{ url_for('compass_info') }}">
+                            <i class="fa-solid fa-compass me-1"></i> MongoDB Compass
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- Status Badges for Local Services -->
+                <div class="d-flex align-items-center gap-2">
+                    <div class="service-pill" title="MongoDB 8.3 Local: localhost:27017">
+                        <span class="status-dot {% if services_status.mongo.ok %}online{% else %}offline{% endif %}"></span>
+                        <span class="service-text"><i class="fa-solid fa-leaf text-success me-1"></i>Mongo</span>
+                    </div>
+                    <div class="service-pill" title="Redis Local: localhost:6379">
+                        <span class="status-dot {% if services_status.redis.ok %}online{% else %}offline{% endif %}"></span>
+                        <span class="service-text"><i class="fa-solid fa-bolt text-danger me-1"></i>Redis</span>
+                    </div>
+                    <button class="btn btn-sm btn-outline-light rounded-pill px-3 ms-2" data-bs-toggle="modal" data-bs-target="#modalPoblar">
+                        <i class="fa-solid fa-arrows-rotate me-1"></i> Sembrar Datos
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="container-fluid px-4 py-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
+                        <i class="fa-solid fa-circle-info me-2"></i> {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Modal para Sembrar / Regenerar Datos -->
+    <div class="modal fade" id="modalPoblar" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header yape-modal-header text-white">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-database me-2"></i>Sembrar Datos Sintéticos</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">
+                        Este proceso reinicializa la base <code>yape_fraude</code> en MongoDB y los conjuntos <code>blacklist:*</code> en Redis.
+                        Crea las colecciones, aplica índices del diseño y siembra exactamente los <strong>5 anillos de fraude</strong> del informe (19 cuentas), cuentas bloqueadas y tráfico de prueba.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Escala adaptada a tu laptop:</label>
+                        <select id="selectEscala" class="form-select">
+                            <option value="300-1500" selected>Ligera (Recomendada): 300 usuarios + 1,500 transacciones (~2 seg)</option>
+                            <option value="600-3000">Media: 600 usuarios + 3,000 transacciones (~4 seg)</option>
+                            <option value="1000-5000">Completa: 1,000 usuarios + 5,000 transacciones (~7 seg)</option>
+                        </select>
+                        <div class="form-text text-success">
+                            <i class="fa-solid fa-check me-1"></i> Todas las escalas incluyen los 5 anillos de fraude sembrados y listas negras $O(1)$.
+                        </div>
+                    </div>
+                    <div id="poblarLoading" class="alert alert-info d-none">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2 text-primary" role="status"></div>
+                            <span>Generando e indexando documentos en MongoDB y claves en Redis...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-yape" id="btnEjecutarPoblar" onclick="ejecutarPoblar()">
+                        <i class="fa-solid fa-play me-1"></i> Iniciar Generación
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer py-3 bg-white border-top text-center text-muted small mt-5">
+        <div class="container">
+            <span class="fw-bold">Caso de Estudio No. 2 - Base de Datos III</span> | 
+            <span>Universidad Mayor de San Andrés (UMSA)</span> | 
+            <span>Dupla: Yoshua Cordova & Erick Serpemtegui (2026)</span>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

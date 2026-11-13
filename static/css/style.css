@@ -1,0 +1,207 @@
+:root {
+    --yape-primary: #7300e6;
+    --yape-dark: #5000a3;
+    --yape-cyan: #00d2c6;
+    --yape-bg: #f8f9fa;
+    --yape-card-bg: #ffffff;
+    --danger-soft: #ffebee;
+    --success-soft: #e8f5e9;
+    --warning-soft: #fff8e1;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: var(--yape-bg);
+    color: #2b2d42;
+}
+
+code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Navbar */
+.yape-navbar {
+    background: linear-gradient(135deg, #7300e6 0%, #4a008c 100%);
+    border-bottom: 2px solid var(--yape-cyan);
+}
+
+.yape-logo-badge {
+    background-color: var(--yape-cyan);
+    color: #1a1a2e;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+}
+
+.bg-cyan {
+    background-color: var(--yape-cyan) !important;
+}
+
+.text-cyan {
+    color: var(--yape-cyan) !important;
+}
+
+.btn-yape {
+    background: linear-gradient(135deg, #7300e6 0%, #5b00b8 100%);
+    color: #ffffff;
+    border: none;
+    font-weight: 600;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-yape:hover {
+    background: linear-gradient(135deg, #8514f5 0%, #6900cf 100%);
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(115, 0, 230, 0.3);
+}
+
+.btn-yape-cyan {
+    background: linear-gradient(135deg, #00d2c6 0%, #00b4a9 100%);
+    color: #1a1a2e;
+    border: none;
+    font-weight: 700;
+}
+
+.btn-yape-cyan:hover {
+    background: linear-gradient(135deg, #1fe5d9 0%, #00c7bb 100%);
+    color: #1a1a2e;
+    transform: translateY(-1px);
+}
+
+/* Service Pills */
+.service-pill {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 4px 10px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: #ffffff;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-dot.online {
+    background-color: #00e676;
+    box-shadow: 0 0 8px #00e676;
+}
+
+.status-dot.offline {
+    background-color: #ff1744;
+    box-shadow: 0 0 8px #ff1744;
+}
+
+/* Cards */
+.card-metric {
+    border: none;
+    border-radius: 14px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+}
+
+.card-metric:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+}
+
+.metric-icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+}
+
+.icon-purple {
+    background-color: rgba(115, 0, 230, 0.12);
+    color: var(--yape-primary);
+}
+
+.icon-cyan {
+    background-color: rgba(0, 210, 198, 0.15);
+    color: #008f86;
+}
+
+.icon-danger {
+    background-color: rgba(239, 71, 111, 0.15);
+    color: #ef476f;
+}
+
+.icon-warning {
+    background-color: rgba(255, 183, 3, 0.2);
+    color: #d48b00;
+}
+
+/* Modals */
+.yape-modal-header {
+    background: linear-gradient(135deg, #7300e6 0%, #4a008c 100%);
+}
+
+/* Tables */
+.table-custom th {
+    background-color: #f1f3f5;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+    font-weight: 700;
+}
+
+/* Badges */
+.badge-completada {
+    background-color: var(--success-soft);
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+}
+
+.badge-rechazada {
+    background-color: var(--danger-soft);
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+}
+
+.badge-pendiente {
+    background-color: var(--warning-soft);
+    color: #b78103;
+    border: 1px solid #ffe082;
+}
+
+/* Graph container */
+#networkContainer {
+    width: 100%;
+    height: 520px;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    background-color: #fafbff;
+}
+
+/* Live Simulation Terminal */
+.terminal-window {
+    background-color: #1e1e2f;
+    color: #f8f8f2;
+    border-radius: 12px;
+    padding: 1rem;
+    font-size: 0.85rem;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.terminal-line {
+    margin-bottom: 4px;
+    font-family: 'JetBrains Mono', monospace;
+}

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Guía MongoDB Compass - Antifraude Yape{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="fw-bold mb-1"><i class="fa-solid fa-compass text-warning me-2"></i>Guía de Integración con MongoDB Compass</h2>
+        <p class="text-muted">Cómo conectarse e inspeccionar visualmente la base de datos <code>yape_fraude</code> desde la aplicación de escritorio MongoDB Compass en tu laptop.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Instrucciones de Conexión -->
+    <div class="col-lg-5">
+        <div class="card card-metric p-4 bg-white mb-4">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-plug text-primary me-2"></i>1. Conexión en MongoDB Compass</h5>
+            <ol class="small text-muted ps-3">
+                <li class="mb-2">Abre <strong>MongoDB Compass</strong> en tu computadora.</li>
+                <li class="mb-2">En la barra de conexión superior, pega la cadena de conexión estándar:
+                    <div class="input-group my-2">
+                        <input type="text" class="form-control font-mono small" value="mongodb://localhost:27017" readonly id="inputMongoUri">
+                        <button class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText('mongodb://localhost:27017'); alert('Copiado');">
+                            <i class="fa-solid fa-copy"></i>
+                        </button>
+                    </div>
+                </li>
+                <li class="mb-2">Haz clic en <strong>"Connect"</strong>.</li>
+                <li>Verás la base de datos <code>yape_fraude</code> creada automáticamente con las siguientes 5 colecciones:</li>
+            </ol>
+
+            <ul class="list-group list-group-flush small font-mono mt-3">
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="fa-solid fa-folder me-2 text-warning"></i>usuarios</span>
+                    <span class="badge bg-light text-dark border">Índices multikey</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="fa-solid fa-folder me-2 text-warning"></i>transacciones</span>
+                    <span class="badge bg-light text-dark border">Inmutables</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="fa-solid fa-folder me-2 text-warning"></i>aristas_flujo</span>
+                    <span class="badge bg-light text-dark border">Proyección ($merge)</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="fa-solid fa-folder me-2 text-warning"></i>alertas_fraude</span>
+                    <span class="badge bg-light text-dark border">Índice ESR</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="fa-solid fa-folder me-2 text-warning"></i>reportes_estafa</span>
+                    <span class="badge bg-light text-dark border">Denuncias</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Pipelines y Filtros Listos para Copiar -->
+    <div class="col-lg-7">
+        <div class="card card-metric p-4 bg-white mb-4">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-code text-cyan me-2"></i>2. Pipelines de Agregación para Compass</h5>
+            <p class="text-muted small">Ve a la pestaña <strong>"Aggregations"</strong> de cada colección en Compass y pega estos pipelines para reproducir las consultas del informe:</p>
+
+            <!-- Dispositivos compartidos -->
+            <div class="mb-3">
+                <label class="form-label fw-bold small text-uppercase text-muted">
+                    Colección <code>usuarios</code> &rarr; Dispositivos compartidos (Cuentas Fantasma):
+                </label>
+                <div class="position-relative">
+                    <pre class="bg-light p-3 rounded border font-mono small text-dark mb-0"><code>[
+  { "$unwind": "$dispositivos" },
+  { "$group": {
+      "_id": "$dispositivos.device_id",
+      "total_cuentas": { "$sum": 1 },
+      "cuentas": { "$push": "$nombre_completo" }
+  }},
+  { "$match": { "total_cuentas": { "$gte": 3 } } },
+  { "$sort": { "total_cuentas": -1 } }
+]</code></pre>
+                </div>
+            </div>
+
+            <!-- Anillos de fraude -->
+            <div class="mb-3">
+                <label class="form-label fw-bold small text-uppercase text-muted">
+                    Colección <code>aristas_flujo</code> &rarr; Detección de Ciclos Circulares ($graphLookup):
+                </label>
+                <div class="position-relative">
+                    <pre class="bg-light p-3 rounded border font-mono small text-dark mb-0"><code>[
+  { "$graphLookup": {
+      "from": "aristas_flujo",
+      "startWith": "$id_receptor",
+      "connectFromField": "id_receptor",
+      "connectToField": "id_emisor",
+      "as": "cadena",
+      "maxDepth": 4,
+      "depthField": "nivel_salto"
+  }},
+  { "$match": {
+      "$expr": { "$in": ["$id_emisor", "$cadena.id_receptor"] }
+  }}
+]</code></pre>
+                </div>
+            </div>
+
+            <!-- Filtro de transacciones -->
+            <div>
+                <label class="form-label fw-bold small text-uppercase text-muted">
+                    Colección <code>transacciones</code> &rarr; Filtrar solo transacciones rechazadas:
+                </label>
+                <pre class="bg-light p-3 rounded border font-mono small text-dark mb-0"><code>{ "estado": "RECHAZADA_FRAUDE" }</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Bandeja de Alertas Antifraude - Yape{% endblock %}
+
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col-md-8">
+        <h2 class="fw-bold mb-1"><i class="fa-solid fa-bell text-danger me-2"></i>Bandeja de Alertas y Gestión de Bloqueos</h2>
+        <p class="text-muted mb-0">Escenario 8: <code>ServicioGestorBloqueos</code> aplica bloqueos en cascada (MongoDB como fuente de la verdad + propagación inmediata a los Sets de Redis).</p>
+    </div>
+    <div class="col-md-4 text-md-end mt-3 mt-md-0">
+        <button class="btn btn-outline-primary btn-sm" onclick="rehidratarRedis()">
+            <i class="fa-solid fa-arrows-rotate me-1"></i> Rehidratar Listas Negras en Redis
+        </button>
+    </div>
+</div>
+
+<div class="card card-metric p-4 bg-white">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0">Alertas Registradas en <code>alertas_fraude</code></h5>
+        <span class="badge bg-light text-dark border">{{ lista_alertas|length }} alertas en total</span>
+    </div>
+
+    {% if lista_alertas %}
+    <div class="table-responsive">
+        <table class="table table-custom table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Fecha Detección</th>
+                    <th>Nivel Riesgo</th>
+                    <th>Tipo de Regla</th>
+                    <th>Usuario Sospechoso</th>
+                    <th>Detalle del Incidente</th>
+                    <th>Estado</th>
+                    <th class="text-end">Acción de Auditoría</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for al in lista_alertas %}
+                <tr>
+                    <td class="small text-muted">{{ al.fecha_deteccion.strftime('%d/%m/%Y %H:%M:%S') if al.fecha_deteccion else '-' }}</td>
+                    <td>
+                        {% if al.nivel_riesgo == 'CRITICO' %}
+                            <span class="badge bg-danger">CRÍTICO</span>
+                        {% elif al.nivel_riesgo == 'ALTO' %}
+                            <span class="badge bg-warning text-dark">ALTO</span>
+                        {% else %}
+                            <span class="badge bg-info text-dark">MEDIO</span>
+                        {% endif %}
+                    </td>
+                    <td><code class="fw-bold">{{ al.tipo_regla }}</code></td>
+                    <td>
+                        <div class="fw-bold">{{ al.nombre_sospechoso or al.id_usuario_sospechoso }}</div>
+                        {% if al.dispositivo_sospechoso %}
+                            <small class="text-muted"><i class="fa-solid fa-mobile-screen me-1"></i>{{ al.dispositivo_sospechoso }}</small>
+                        {% endif %}
+                    </td>
+                    <td class="small">{{ al.detalle }}</td>
+                    <td>
+                        {% if al.estado == 'PENDIENTE' %}
+                            <span class="badge bg-warning text-dark"><i class="fa-solid fa-clock me-1"></i>Pendiente</span>
+                        {% elif al.estado == 'CONFIRMADO' %}
+                            <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Confirmado</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ al.estado }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        {% if al.estado == 'PENDIENTE' %}
+                            <button class="btn btn-sm btn-danger fw-bold" onclick="confirmarAlerta('{{ al._id }}')">
+                                <i class="fa-solid fa-gavel me-1"></i> Confirmar y Bloquear
+                            </button>
+                        {% else %}
+                            <span class="small text-muted"><i class="fa-solid fa-shield-check text-success me-1"></i>Bloqueo activo en Redis</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="fa-solid fa-bell-slash fa-3x text-secondary mb-2"></i>
+            <p>No hay alertas en este momento.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
