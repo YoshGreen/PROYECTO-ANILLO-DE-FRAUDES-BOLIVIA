@@ -71,10 +71,15 @@ def index():
 @app.route("/transferir")
 def transferir():
     bd = get_mongo_db()
-    # Obtenemos algunos usuarios normales y algunos de los anillos para facilitar pruebas en el formulario
-    usuarios_normales = list(bd.usuarios.find({"estado_cuenta": "ACTIVA"}).limit(15))
-    usuarios_anillo = list(bd.usuarios.find({"dispositivos.device_id": {"$regex": "^DEV-SHARED"}}).limit(10))
-    usuarios_bloqueados = list(bd.usuarios.find({"estado_cuenta": "BLOQUEADA"}).limit(5))
+    try:
+        usuarios_normales = list(bd.usuarios.find({"estado_cuenta": "ACTIVA"}).limit(15))
+        usuarios_anillo = list(bd.usuarios.find({"dispositivos.device_id": {"$regex": "^DEV-SHARED"}}).limit(10))
+        usuarios_bloqueados = list(bd.usuarios.find({"estado_cuenta": "BLOQUEADA"}).limit(5))
+    except Exception as e:
+        usuarios_normales = []
+        usuarios_anillo = []
+        usuarios_bloqueados = []
+        flash(f"Aviso de conexión MongoDB: {e}", "warning")
     return render_template("transferir.html",
                            usuarios_normales=usuarios_normales,
                            usuarios_anillo=usuarios_anillo,
@@ -82,14 +87,7 @@ def transferir():
 
 @app.route("/anillos")
 def anillos():
-    bd = get_mongo_db()
-    det = ServicioDetectorAnillos(bd)
-    try:
-        lista_anillos = det.detectar_todos_anillos()
-    except Exception as e:
-        lista_anillos = []
-        flash(f"Error al ejecutar detección de anillos: {e}", "danger")
-    return render_template("anillos.html", lista_anillos=lista_anillos)
+    return redirect(url_for("trazabilidad"))
 
 @app.route("/cuentas-fantasma")
 def cuentas_fantasma():
@@ -163,7 +161,11 @@ def listas_negras():
 @app.route("/trazabilidad")
 def trazabilidad():
     bd = get_mongo_db()
-    usuarios = list(bd.usuarios.find({}, {"nombre_completo": 1, "ci_documento": 1, "telefono_principal": 1}).limit(40))
+    try:
+        usuarios = list(bd.usuarios.find({}, {"nombre_completo": 1, "ci_documento": 1, "telefono_principal": 1}).limit(40))
+    except Exception as e:
+        usuarios = []
+        flash(f"Aviso de conexión MongoDB: {e}", "warning")
     return render_template("trazabilidad.html", usuarios=usuarios)
 
 @app.route("/compass-info")
@@ -263,52 +265,6 @@ def api_rehidratar():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-@app.route("/api/grafo-anillos")
-def api_grafo_anillos():
-    """Genera nodos y aristas en formato JSON compatible con Vis.js Network."""
-    bd = get_mongo_db()
-    det = ServicioDetectorAnillos(bd)
-    try:
-        anillos = det.detectar_todos_anillos()
-        nodes_dict = {}
-        edges_list = []
-
-        # Color palette
-        ring_colors = ["#e63946", "#f77f00", "#d62828", "#8338ec", "#3a86ff", "#06d6a0"]
-
-        for idx, a in enumerate(anillos):
-            color = ring_colors[idx % len(ring_colors)]
-            nodos = a["nodos"]
-            for n in nodos:
-                nid = n["id"]
-                if nid not in nodes_dict:
-                    nodes_dict[nid] = {
-                        "id": nid,
-                        "label": n["nombre"],
-                        "title": f"CI: {n['ci']}\nTel: {n['telefono']}\nDisp: {n['dispositivo']}\nEstado: {n['estado']}",
-                        "color": color if n["estado"] != "BLOQUEADA" else "#4a4e69",
-                        "shape": "dot",
-                        "size": 22
-                    }
-                else:
-                    nodes_dict[nid]["color"] = color
-
-            for i in range(len(nodos)):
-                from_id = nodos[i]["id"]
-                to_id = nodos[(i + 1) % len(nodos)]["id"]
-                edges_list.append({
-                    "from": from_id,
-                    "to": to_id,
-                    "arrows": "to",
-                    "color": {"color": color, "highlight": "#ff006e"},
-                    "width": 3,
-                    "label": f"Anillo {idx+1}"
-                })
-
-        return jsonify({"nodes": list(nodes_dict.values()), "edges": edges_list, "total_anillos": len(anillos)})
-    except Exception as e:
-        return jsonify({"error": str(e), "nodes": [], "edges": []}), 500
-
 @app.route("/api/ruta-dinero", methods=["POST"])
 def api_ruta_dinero():
     bd = get_mongo_db()
@@ -358,4 +314,4 @@ if __name__ == "__main__":
     print("  Base de Datos III - MongoDB & Redis (100% Local)")
     print("  Iniciando servidor web en: http://127.0.0.1:5000")
     print("=================================================================")
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False, threaded=True)

@@ -51,18 +51,14 @@ Web_AnillosFraude/
 │   ├── base.html           # Plantilla base con navbar y badges de estado
 │   ├── index.html          # Dashboard general con métricas en tiempo real
 │   ├── transferir.html     # Simulador de pagos y validación antifraude
-│   ├── anillos.html        # Detector de anillos con visualizador de grafos Vis.js
-│   ├── cuentas_fantasma.html # Auditoría de celulares y teléfonos compartidos
-│   ├── alertas.html        # Bandeja de alertas y bloqueo en cascada
-│   ├── listas_negras.html  # Inspección de claves y TTLs en memoria de Redis
-│   ├── trazabilidad.html   # Ruta del dinero ($graphLookup)
-│   └── compass_info.html   # Guía paso a paso para MongoDB Compass
+│   ├── cuentas_fantasma.html # Auditoría de celulares y teléfonos compartidos (Multikey $unwind + $group)
+│   ├── alertas.html        # Bandeja de alertas y bloqueo en cascada (Índice ESR)
+│   ├── listas_negras.html  # Inspección de claves y TTLs en memoria de Redis (O(1))
+│   ├── trazabilidad.html   # Ruta del dinero y saltos entre cuentas ($graphLookup)
+│   └── compass_info.html   # Guía paso a paso y pipelines para MongoDB Compass
 └── static/
     ├── css/style.css       # Estilos temáticos Yape Bolivia (púrpura y cian)
-    └── js/main.js          # Controladores AJAX y visualización interactiva
-```
-
-ca
+    └── js/main.js          # Controladores AJAX y modales
 
 ---
 

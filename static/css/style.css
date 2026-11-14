@@ -181,15 +181,6 @@ code, pre, .font-mono {
     border: 1px solid #ffe082;
 }
 
-/* Graph container */
-#networkContainer {
-    width: 100%;
-    height: 520px;
-    border: 1px solid #e0e0e0;
-    border-radius: 12px;
-    background-color: #fafbff;
-}
-
 /* Live Simulation Terminal */
 .terminal-window {
     background-color: #1e1e2f;
@@ -199,9 +190,157 @@ code, pre, .font-mono {
     font-size: 0.85rem;
     max-height: 280px;
     overflow-y: auto;
+    word-break: break-word;
 }
 
 .terminal-line {
     margin-bottom: 4px;
     font-family: 'JetBrains Mono', monospace;
+}
+
+/* =========================================================================
+   SISTEMA DE DISEÑO RESPONSIVO (MOBILE, TABLET & DESKTOP)
+   ========================================================================= */
+
+/* Suavizado de desplazamiento táctil para tablas y preformateados */
+.table-responsive {
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+}
+
+pre, code {
+    max-width: 100%;
+    word-break: break-word;
+}
+
+pre code {
+    white-space: pre;
+    word-break: normal;
+}
+
+/* Mejoras en select y controles en pantallas táctiles */
+.form-select, .form-control {
+    max-width: 100%;
+}
+
+@media (max-width: 768px) {
+    .form-select, .form-control {
+        font-size: 0.95rem;
+    }
+}
+
+/* Media Query: Tablets y Móviles (< 992px) */
+@media (max-width: 991.98px) {
+    .yape-navbar {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+
+    .navbar-collapse {
+        background: rgba(80, 0, 163, 0.98);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-top: 0.75rem;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .navbar-nav .nav-link {
+        padding: 0.6rem 0.8rem;
+        border-radius: 8px;
+        margin-bottom: 2px;
+    }
+
+    .navbar-nav .nav-link:hover,
+    .navbar-nav .nav-link.active {
+        background-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .card-metric {
+        padding: 1.25rem !important;
+        margin-bottom: 1rem;
+    }
+
+    .metric-icon-box {
+        width: 42px;
+        height: 42px;
+        font-size: 1.2rem;
+    }
+}
+
+/* Media Query: Móviles pequeños y medianos (< 576px) */
+@media (max-width: 575.98px) {
+    body {
+        font-size: 0.9rem;
+    }
+
+    h2 {
+        font-size: 1.35rem;
+    }
+
+    h3 {
+        font-size: 1.25rem;
+    }
+
+    h4 {
+        font-size: 1.1rem;
+    }
+
+    h5 {
+        font-size: 1rem;
+    }
+
+    .yape-logo-badge {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+
+    .card-metric {
+        padding: 1rem !important;
+        border-radius: 10px;
+    }
+
+    .table-custom th, .table-custom td {
+        padding: 0.5rem 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    .badge {
+        font-size: 0.75rem;
+    }
+
+    .btn {
+        font-size: 0.85rem;
+    }
+
+    /* Ajuste para que las cajitas de 3 métricas no colapsen en teléfonos */
+    .row.text-center.g-2 > div {
+        padding-left: 3px;
+        padding-right: 3px;
+    }
+
+    .row.text-center.g-2 .p-3 {
+        padding: 0.6rem 0.3rem !important;
+    }
+
+    .row.text-center.g-2 h4 {
+        font-size: 0.95rem;
+    }
+
+    .row.text-center.g-2 code {
+        font-size: 0.68rem;
+        display: block;
+        word-break: break-all;
+    }
+
+    .terminal-window {
+        max-height: 220px;
+        font-size: 0.75rem;
+        padding: 0.75rem;
+    }
+
+    /* Modal full-screen friendly */
+    .modal-dialog {
+        margin: 0.5rem;
+    }
 }
