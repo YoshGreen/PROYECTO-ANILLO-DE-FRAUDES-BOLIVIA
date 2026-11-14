@@ -1,0 +1,1615 @@
+% =====================================================================
+% INFORME FINAL - Dupla No. 2 - Base de Datos III (UMSA)
+% Sistema de deteccion de anillos de fraude y cuentas fantasma
+% en billeteras moviles de Yape Bolivia (MongoDB + Redis, 100 % local)
+%
+% NOTA: los valores marcados en rojo con corchetes, por ejemplo [XX ms],
+% son mediciones que deben completarse al ejecutar los scripts de la
+% Seccion 6 en el equipo del grupo (Seccion 7).
+% Si se dispone del logo, colocarlo en img/LOGOumsa.png
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-noshorthands]{babel}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{booktabs,tabularx,array,enumitem,xcolor,listings,titlesec,float,graphicx}
+\usepackage{tikz}
+\usetikzlibrary{babel,arrows.meta,positioning,shapes.geometric,shapes.multipart,fit,backgrounds,calc}
+
+\addto\captionsspanish{\renewcommand{\tablename}{Tabla}}
+\addto\captionsspanish{\renewcommand{\listtablename}{Índice de tablas}}
+\addto\captionsspanish{\renewcommand{\refname}{Bibliografía}}
+
+\definecolor{codebg}{RGB}{246,246,246}
+\definecolor{codeframe}{RGB}{180,180,180}
+
+\lstset{
+	basicstyle=\ttfamily\footnotesize,
+	backgroundcolor=\color{codebg},
+	frame=single,
+	rulecolor=\color{codeframe},
+	breaklines=true,
+	columns=fullflexible,
+	keepspaces=true,
+	showstringspaces=false,
+	xleftmargin=0.2em,
+	xrightmargin=0.2em,
+	aboveskip=0.7em,
+	belowskip=0.7em,
+	literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+	{Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+	{ñ}{{\~n}}1 {Ñ}{{\~N}}1
+}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+% Valor pendiente de medir (se reemplaza por el resultado real)
+\newcommand{\med}[1]{\textcolor{red!70!black}{\textbf{[#1]}}}
+
+\titleformat{\section}{\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection.}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection.}{0.6em}{}
+\titleformat{\paragraph}[hang]{\normalsize\bfseries}{}{0pt}{}
+\titlespacing*{\paragraph}{0pt}{1.2em plus 0.3em}{0.4em}
+
+\setlength{\parskip}{0.45em}
+\setlength{\parindent}{0pt}
+\setcounter{tocdepth}{3}
+
+% Diagramas de secuencia (TikZ)
+\newcommand{\lifeline}[3]{%
+	\node[draw,fill=gray!15,font=\scriptsize\bfseries,align=center,text width=2.5cm,minimum height=0.8cm] at (#1,0) {#2};
+	\draw[dashed,gray] (#1,-0.4) -- (#1,#3);}
+\newcommand{\msg}[5]{%
+	\draw[#5,-{Stealth}] (#1,#3) -- node[above,font=\scriptsize,midway,align=center,inner sep=1.5pt,fill=white]{#4} (#2,#3);}
+
+\usepackage[hidelinks]{hyperref}
+
+\begin{document}
+	
+	\begin{titlepage}
+		\centering
+		{\Large\bfseries UNIVERSIDAD MAYOR DE SAN ANDRÉS}\\[0.4cm]
+		{\large FACULTAD DE CIENCIAS PURAS Y NATURALES}\\[0.3cm]
+		{\large CARRERA DE INFORMÁTICA}\\[0.8cm]
+		
+		\IfFileExists{img/LOGOumsa.png}{\includegraphics[width=0.45\linewidth]{img/LOGOumsa.png}}{%
+			\IfFileExists{img/LOGOumsa.jpg}{\includegraphics[width=0.45\linewidth]{img/LOGOumsa.jpg}}{%
+				\fbox{\parbox[c][5cm][c]{0.4\linewidth}{\centering Logo UMSA\\(img/LOGOumsa)}}}}\\[1cm]
+		
+		{\LARGE\bfseries Sistema de Detección de Anillos de Fraude y Cuentas Fantasma\\en Billeteras Móviles de Yape Bolivia\\[0.3cm]
+			\large Metodología Domain-Driven Design (DDD) y diseño de base de datos con MongoDB y Redis}\\[1cm]
+		
+		{\Large\bfseries DUPLA No. 2}\\[1cm]
+		
+		\begin{flushleft}
+			\hspace{3cm}\textbf{MATERIA:} Base de Datos III\\[0.3cm]
+			\hspace{3cm}\textbf{DOCENTE:} Lic. Tarquino\\[0.3cm]
+			\hspace{3cm}\textbf{INTEGRANTES:}\\[0.2cm]
+			\hspace{3.5cm}-- Cordova Avendaño Yoshua Aaron\\
+			\hspace{3.5cm}-- Serpemtegui Flores Erick Sebastian
+		\end{flushleft}
+		
+		\vfill
+		{\large\bfseries LA PAZ -- BOLIVIA}\\[0.2cm]
+		{\large\bfseries 2026}
+	\end{titlepage}
+	
+	\tableofcontents
+	\newpage
+	
+	% =====================================================================
+	\section{Introducción}
+	En el contexto financiero boliviano, la digitalización de los servicios de pago ha experimentado una expansión acelerada, impulsada principalmente por la interoperabilidad del sistema de cobros y pagos mediante códigos QR y la adopción masiva de billeteras móviles. En este escenario, Yape Bolivia (respaldada por el Banco de Crédito de Bolivia S.A. -- BCP) se ha consolidado como la plataforma transaccional de mayor penetración, facilitando transferencias inmediatas de bajo monto entre personas y comercios. No obstante, la inmediatez operativa y la simplificación en los procesos de enrolamiento digital han expuesto a la plataforma a nuevas tipologías de delitos informáticos, tales como la suplantación de identidad, la proliferación de cuentas fantasma y el desvío coordinado de fondos a través de anillos de fraude.
+	
+	Las arquitecturas convencionales basadas en sistemas de gestión de bases de datos relacionales (RDBMS) presentan severas restricciones de rendimiento al intentar mitigar estas amenazas en tiempo de ejecución. La detección de patrones fraudulentos complejos ---como la identificación de múltiples cuentas operadas desde un mismo identificador de dispositivo móvil físico o la trazabilidad de transferencias trianguladas entre cuentas puente (<<mulas>>)--- requiere la ejecución de múltiples operaciones \texttt{JOIN} recursivas sobre tablas con decenas de millones de registros. Esto genera degradación del rendimiento computacional y cuellos de botella que impiden validar las transacciones dentro de los estrictos márgenes de latencia exigidos por los usuarios en ventanilla o comercios.
+	
+	Para responder a esta exigencia operativa sin comprometer el procesamiento contable central, el presente proyecto formula el diseño e implementación de una solución de persistencia no relacional (NoSQL) con enfoque de Big Data, concebida como un subsistema especializado de evaluación de riesgo y auditoría transaccional para Yape Bolivia. La propuesta se basa en una arquitectura políglota de dos niveles:
+	\begin{enumerate}[leftmargin=2em]
+		\item \textbf{MongoDB}, como base de datos orientada a documentos, encargada del almacenamiento duradero de esquemas heterogéneos de usuarios, la ingestión de históricos inmutables de transacciones y la ejecución de consultas analíticas profundas mediante el operador recursivo \texttt{\$graphLookup}.
+		\item \textbf{Redis}, como motor clave-valor en memoria, diseñado para absorber la verificación instantánea de listas negras y el control de frecuencia transaccional (\textit{velocity checks}) con tiempos de respuesta en submilisegundos.
+	\end{enumerate}
+	
+	El informe sigue esta estructura: la Sección~2 describe el caso de estudio y su contexto; la Sección~3 plantea el problema y los objetivos; la Sección~4 presenta el marco teórico (DDD y modelado NoSQL); la Sección~5 desarrolla el diseño completo (mapa de contexto, dominio, agregados, entradas, proceso, salida, eventos, servicios de dominio y escenarios); la Sección~6 documenta la implementación del prototipo local; la Sección~7 analiza los resultados; la Sección~8 presenta las conclusiones y recomendaciones; y la Sección~9 lista la bibliografía.
+	
+	\textit{Aclaración:} este es un caso de estudio académico. Los volúmenes y las cifras provienen de una propuesta del equipo y sirven para dimensionar el diseño; no corresponden a datos internos de una empresa real.
+	
+	% =====================================================================
+	\section{Descripción y contexto del caso de estudio}
+	El caso de estudio se delimita en la infraestructura del motor antifraude de Yape Bolivia, entidad encargada de autorizar, registrar y auditar las transferencias electrónicas en tiempo real a nivel nacional.
+	
+	\subsection{Dinámica del fraude en el ecosistema Yape}
+	La operativa de la aplicación exige que las transferencias se liquiden de forma inmediata. Las organizaciones delictivas explotan esta característica a través de dos mecanismos principales:
+	\begin{itemize}[leftmargin=2em]
+		\item \textbf{Uso de dispositivos compartidos y cuentas fantasma:} redes delictivas que utilizan identidades falsas o coaccionadas para dar de alta múltiples cuentas en Yape, operando de manera encubierta desde un número reducido de terminales móviles compartidos (mismo \texttt{device\_id} o IMEI) o asociadas a números de telefonía móvil descartables.
+		\item \textbf{Dispersión circular de fondos (\textit{smurfing}):} fondos sustraídos mediante estafas digitales son transferidos de manera fraccionada y secuencial entre tres o más cuentas intermediarias (A $\to$ B $\to$ C $\to$ A) en lapsos de minutos, buscando quebrar la trazabilidad de los fondos antes de que la víctima reporte el incidente o se proceda al congelamiento de las cuentas.
+	\end{itemize}
+	
+	\subsection{Perfil de carga y requerimientos de escala}
+	Para sostener la operación dentro del ecosistema boliviano, el sistema se dimensiona bajo los siguientes parámetros de carga de trabajo:
+	\begin{itemize}[leftmargin=2em]
+		\item \textbf{Distribución de operaciones:} el 75\,\% del tráfico total consiste en verificaciones críticas de listas de exclusión y evaluación de reglas de riesgo transaccional previo al débito; el 15\,\% corresponde a tareas de analítica forense y detección de rutas de dinero ejecutadas por auditores de seguridad; y el 10\,\% restante comprende altas de usuarios, vinculación de dispositivos y actualización de credenciales.
+		\item \textbf{Volumen y crecimiento:} la plataforma procesa aproximadamente 3,5 millones de transferencias mensuales ($\sim$120\,000 operaciones diarias inmutables), acumulando un volumen histórico superior a 45 millones de transacciones por año. Administra una base de 2,5 millones de cuentas activas y 3,8 millones de dispositivos registrados, lo que conforma una red de más de 55 millones de interacciones históricas en constante evaluación. El parque de dispositivos se incrementa a un ritmo aproximado de 4\,000 registros diarios.
+		\item \textbf{Condiciones críticas de latencia:} para no degradar la experiencia de pago en caja ni generar demoras en la aplicación móvil, las validaciones de listas de bloqueo y reglas de riesgo previas a la transacción deben ejecutarse en un tiempo inferior a los 50 milisegundos, mientras que el almacenamiento transaccional debe garantizar inmutabilidad absoluta para auditoría regulatoria.
+	\end{itemize}
+	
+	% =====================================================================
+	\section{Planteamiento del problema y objetivos}
+	
+	\subsection{Planteamiento del problema}
+	En el modelo operativo de Yape Bolivia existe una tensión constante entre la velocidad de procesamiento exigida por el usuario y la profundidad analítica requerida para prevenir el fraude. Bajo esquemas relacionales rígidos, evaluar si el destinatario de una transferencia por código QR pertenece a una red de cuentas puente requiere ejecutar costosas consultas de combinación sobre tablas de transacciones masivas. A medida que el histórico supera las decenas de millones de registros, estas consultas aumentan el tiempo de respuesta y saturan el procesador del servidor central, forzando a relajar los filtros de detección o a generar retrasos inaceptables en el flujo de pagos legítimos. Asimismo, las bases de datos relacionales tradicionales no ofrecen mecanismos nativos óptimos para capturar atributos móviles polimórficos (versiones de sistema operativo, identificadores biométricos y hardware de terminales) sin recurrir a estructuras normalizadas dispersas que ralentizan las consultas.
+	
+	Por tanto, se formula el siguiente problema de investigación técnica:
+	
+	\begin{quote}
+		\textit{¿De qué manera una arquitectura de persistencia NoSQL híbrida, basada en MongoDB y Redis, permite optimizar la verificación de riesgo en tiempo real, la ingestión masiva de eventos transaccionales inmutables y la identificación de anillos de fraude y cuentas fantasma en el ecosistema de Yape Bolivia?}
+	\end{quote}
+	
+	\subsection{Objetivos}
+	\subsubsection*{Objetivo general}
+	Diseñar e implementar una solución de base de datos NoSQL híbrida y escalable para el subsistema de prevención y detección de fraude de Yape Bolivia, aplicando los principios del Diseño Guiado por el Dominio (DDD) y metodologías de modelado no relacional sobre MongoDB y Redis, orientada a gestionar la ingestión masiva de eventos transaccionales inmutables y optimizar la identificación de anillos de fraude, cuentas fantasma y transferencias circulares en tiempo real.
+	
+	\subsubsection*{Objetivos específicos}
+	\begin{enumerate}[leftmargin=2em]
+		\item Modelar el dominio del problema bajo el enfoque de \textit{Domain-Driven Design} (DDD), delimitando los contextos acotados (\textit{Bounded Contexts}) de Yape Bolivia, identificando los agregados principales, eventos de dominio y servicios requeridos para el rastreo de operaciones fraudulentas.
+		\item Aplicar la metodología de modelado de datos NoSQL estructurada en fases (Entradas, Proceso y Salida), evaluando la carga de trabajo transaccional (\textit{workload}), las decisiones de incrustación frente a referencia (\textit{embed vs.\ reference}) y dimensionando los esquemas documentales para optimizar el rendimiento y el consumo de almacenamiento.
+		\item Construir e implementar la arquitectura de persistencia políglota (MongoDB y Redis) en un entorno de desarrollo local, configurando las colecciones documentales, las estructuras en memoria de clave-valor y los esquemas de validación de datos necesarios.
+		\item Desarrollar la lógica de consultas críticas y algoritmos de detección de fraude, implementando mecanismos de listas negras en memoria ($O(1)$) mediante conjuntos de Redis y \textit{pipelines} de agregación recursiva (\texttt{\$graphLookup}) en MongoDB para la reconstrucción de grafos transaccionales y transferencias circulares.
+		\item Evaluar el rendimiento y la escalabilidad del sistema frente a cargas masivas de datos, mediante la generación controlada de datasets sintéticos representativos del flujo transaccional boliviano, analizando métricas de latencia de lectura/escritura y el comportamiento de los índices ante los umbrales operativos exigidos.
+	\end{enumerate}
+	
+	% =====================================================================
+	\section{Marco teórico}
+	
+	\subsection{DDD}
+	
+	\subsubsection{Origen y propósito}
+	\textit{Domain-Driven Design} (Diseño Dirigido por el Dominio) es una metodología de diseño de software propuesta por Eric Evans en 2003. Su idea central es que la complejidad de un sistema proviene del dominio del negocio (el problema real que se resuelve) y no de la tecnología. Por eso el modelo se construye primero con los expertos del negocio y solo después se decide cómo guardarlo en una base de datos.
+	
+	DDD se divide en dos niveles:
+	\begin{itemize}[leftmargin=2em]
+		\item \textbf{Diseño estratégico:} divide un problema grande en partes manejables y define cómo se relacionan.
+		\item \textbf{Diseño táctico:} define los bloques de construcción con los que se modela cada parte por dentro.
+	\end{itemize}
+	
+	\subsubsection{Diseño estratégico}
+	\begin{table}[H]
+		\centering
+		\caption{Conceptos del diseño estratégico}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.2cm}Y}
+			\toprule
+			\textbf{Concepto} & \textbf{Definición} \\
+			\midrule
+			Dominio & El área de negocio que el software debe resolver. \\
+			Subdominio & Una parte del dominio. Puede ser \textit{core} (lo que da ventaja competitiva), de soporte (necesario pero no diferenciador) o genérico (problema resuelto de forma estándar). \\
+			Lenguaje ubicuo & Vocabulario común entre expertos y desarrolladores, usado igual en conversaciones, documentos, código y base de datos. \\
+			Contexto delimitado (\textit{Bounded Context}) & Frontera dentro de la cual cada término tiene un significado único y el modelo es coherente. \\
+			Mapa de contextos & Diagrama que muestra los contextos y el tipo de relación entre ellos. \\
+			\textit{Event Storming} & Taller para descubrir el dominio ordenando en una línea de tiempo los eventos que ocurren en el negocio. \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	Los contextos pueden relacionarse con distintos patrones. Los más usados se resumen en la Tabla~\ref{tab:patrones-ctx}.
+	
+	\begin{table}[H]
+		\centering
+		\caption{Patrones de relación entre contextos}
+		\label{tab:patrones-ctx}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.2cm}Y}
+			\toprule
+			\textbf{Patrón} & \textbf{Descripción} \\
+			\midrule
+			Cliente--Proveedor (CP) & Un contexto aguas arriba (proveedor) entrega lo que necesita otro aguas abajo (cliente) y ambos acuerdan los cambios. \\
+			Servicio de anfitrión abierto (OHS) & El contexto ofrece una interfaz pública y estable para que otros la consuman. \\
+			Capa anticorrupción (ACL) & El contexto consumidor traduce el modelo ajeno al suyo para no contaminarse. \\
+			Conformista (CF) & El consumidor adopta tal cual el modelo del proveedor, sin traducirlo. \\
+			Núcleo compartido & Dos contextos comparten una pequeña parte del modelo, con coordinación estricta. \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	\subsubsection{Diseño táctico}
+	\begin{table}[H]
+		\centering
+		\caption{Bloques de construcción del diseño táctico}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.2cm}Y}
+			\toprule
+			\textbf{Bloque} & \textbf{Definición} \\
+			\midrule
+			Entidad & Objeto con identidad propia que se mantiene aunque cambien sus atributos. \\
+			Objeto de valor (\textit{Value Object}) & Objeto sin identidad, definido por sus atributos e inmutable (por ejemplo, un monto o una ubicación). \\
+			Agregado & Grupo de entidades y objetos de valor que se tratan como una unidad de consistencia. \\
+			Raíz del agregado & Única entrada permitida al agregado; garantiza sus reglas. \\
+			Invariante & Regla de negocio que siempre debe cumplirse dentro de un agregado. \\
+			Servicio de dominio & Lógica del negocio que no pertenece naturalmente a una sola entidad. \\
+			Evento de dominio & Hecho relevante que ya ocurrió, nombrado en pasado (\textit{TransferenciaAutorizada}). \\
+			Repositorio & Abstracción para guardar y recuperar agregados completos. \\
+			Fábrica (\textit{Factory}) & Crea agregados complejos asegurando que nazcan válidos. \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	\subsubsection{Reglas de los agregados}
+	\begin{enumerate}[leftmargin=2em]
+		\item Se accede al agregado únicamente a través de su raíz.
+		\item Cada agregado es una frontera transaccional: lo que cambia junto, se guarda junto.
+		\item Un agregado se refiere a otros agregados solo por su identificador, nunca incrustándolos completos.
+		\item Entre agregados distintos se acepta consistencia eventual, comunicada mediante eventos de dominio.
+		\item Los agregados se diseñan pequeños: crecer sin límite es una señal de mal diseño.
+	\end{enumerate}
+	
+	\subsubsection{DDD y MongoDB}
+	DDD y MongoDB encajan de forma natural porque un agregado se almacena como un solo documento, y las operaciones sobre un único documento son atómicas.
+	
+	\begin{table}[H]
+		\centering
+		\caption{Correspondencia entre DDD y MongoDB}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{5cm}Y}
+			\toprule
+			\textbf{Concepto DDD} & \textbf{Implementación en MongoDB} \\
+			\midrule
+			Agregado & Un documento (o un pequeño grupo de documentos). \\
+			Entidad hija & Subdocumento dentro de un arreglo acotado. \\
+			Objeto de valor & Subdocumento embebido. \\
+			Referencia a otro agregado & Campo con el \texttt{\_id} del otro, resuelto con \texttt{\$lookup}. \\
+			Repositorio & Una colección y sus consultas. \\
+			Invariante & Validación de esquema JSON, índices únicos y roles. \\
+			Evento de dominio & Cambio observable con \textit{Change Streams}. \\
+			Modelo de lectura (proyección) & Colección derivada, como \texttt{aristas\_flujo}. \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	\subsubsection{Proceso seguido en este proyecto}
+	\begin{enumerate}[leftmargin=2em]
+		\item Entender el dominio con los expertos del negocio y definir el lenguaje ubicuo.
+		\item Clasificar subdominios (\textit{core}, soporte, genérico).
+		\item Delimitar los contextos y dibujar el mapa de contextos.
+		\item Identificar agregados, invariantes, eventos y servicios de dominio.
+		\item Traducir los agregados a colecciones, decidiendo qué se incrusta y qué se referencia.
+		\item Definir índices, validaciones y consultas por escenario.
+	\end{enumerate}
+	
+	\subsection{Metodología de modelado de datos NoSQL}
+	En una base de datos relacional se suele partir de los datos: se normalizan en tablas y luego se escriben las consultas. En una base de datos documental se parte de lo contrario: primero se entiende cómo se usarán los datos (la carga de trabajo) y luego se diseñan los documentos para que esas operaciones sean rápidas. La metodología aplicada en este proyecto sigue tres fases: entradas, proceso y salida.
+	
+	\subsubsection{Principios del modelado documental}
+	\begin{itemize}[leftmargin=2em]
+		\item \textbf{Diseñar para las consultas:} el modelo se deriva de los escenarios y de su frecuencia, no de un diagrama entidad-relación.
+		\item \textbf{Lo que se lee junto, se guarda junto:} los datos que casi siempre se consultan a la vez se incrustan en el mismo documento.
+		\item \textbf{Desnormalizar con criterio:} se acepta duplicar datos pequeños y estables para evitar uniones, y se evita duplicar datos que cambian con frecuencia.
+		\item \textbf{Esquema flexible no significa esquema libre:} se define una forma esperada y se valida con JSON Schema.
+		\item \textbf{Arreglos acotados:} un documento no puede superar los 16\,MB, por lo que los arreglos que crecen sin límite se separan en otra colección.
+		\item \textbf{Atomicidad por documento:} las operaciones sobre un documento son atómicas; por eso un agregado de DDD encaja como un documento.
+	\end{itemize}
+	
+	\subsubsection{Fases de la metodología}
+	\begin{figure}[H]
+		\centering
+		\begin{tikzpicture}[
+			blk/.style={draw,rounded corners=3pt,align=center,font=\scriptsize,text width=3.4cm,minimum height=0.8cm,inner sep=3pt},
+			hdr/.style={font=\small\bfseries,align=center}]
+			\node[hdr] at (0,6.2) {ENTRADAS};
+			\node[hdr] at (5.6,6.2) {PROCESO};
+			\node[hdr] at (11.2,6.2) {SALIDA};
+			\node[blk,fill=blue!10] (e1) at (0,4.2) {A. Escenarios (casos de uso)};
+			\node[blk,fill=blue!10] (e2) at (0,3.0) {B. Registros de producción y estadísticas};
+			\node[blk,fill=blue!10] (e3) at (0,1.8) {C. Experto en el dominio del negocio};
+			\node[blk,fill=blue!10] (e4) at (0,0.6) {D. Experto en modelado de datos};
+			\node[blk,fill=orange!20] (p1) at (5.6,3.6) {A. Carga de trabajo (workload)};
+			\node[blk,fill=orange!20] (p2) at (5.6,1.2) {B. Relaciones (relationships)};
+			\node[blk,fill=green!12] (s1) at (11.2,5.25) {A. Supuestos};
+			\node[blk,fill=green!12] (s2) at (11.2,4.30) {B. Consultas (queries)};
+			\node[blk,fill=green!12] (s3) at (11.2,3.35) {C. Índices};
+			\node[blk,fill=green!12] (s4) at (11.2,2.40) {D. Dimensionamiento de datos};
+			\node[blk,fill=green!12] (s5) at (11.2,1.45) {E. Operaciones};
+			\node[blk,fill=green!12] (s6) at (11.2,0.50) {G. Campos: colecciones y esquemas};
+			\node[blk,fill=green!12] (s7) at (11.2,-0.45) {H. Formas (shapes)};
+			\node[draw,dashed,fit=(e1)(e4),inner sep=8pt] (EN) {};
+			\node[draw,dashed,fit=(p1)(p2),inner sep=8pt] (PR) {};
+			\node[draw,dashed,fit=(s1)(s7),inner sep=8pt] (SA) {};
+			\draw[-{Stealth},very thick] (EN.east) -- (PR.west);
+			\draw[-{Stealth},very thick] (PR.east) -- (SA.west);
+		\end{tikzpicture}
+		\caption{Metodología de modelado de datos NoSQL: de las entradas (qué necesita el negocio) a la salida (el esquema de la base de datos).}
+	\end{figure}
+	
+	\begin{table}[H]
+		\centering
+		\caption{Elementos de cada fase y la pregunta que responden}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2cm}>{\raggedright\arraybackslash}p{4.6cm}Y}
+			\toprule
+			\textbf{Fase} & \textbf{Elemento} & \textbf{Pregunta que responde} \\
+			\midrule
+			Entradas & Escenarios (casos de uso) & ¿Qué necesita hacer cada actor con el sistema? \\
+			& Registros de producción y estadísticas & ¿Cuánto se usa cada operación y cuántos datos hay? \\
+			& Experto en el dominio & ¿Qué reglas y prioridades tiene el negocio? \\
+			& Experto en modelado & ¿Qué decisiones técnicas recomienda para los datos? \\
+			\midrule
+			Proceso & Carga de trabajo & ¿Qué operaciones son críticas y cuántos recursos exigen? \\
+			& Relaciones & ¿Cómo se relacionan los datos y se incrustan o referencian? \\
+			\midrule
+			Salida & Supuestos y consultas & ¿Bajo qué condiciones vale el diseño y qué consultas resuelve? \\
+			& Índices, dimensionamiento y operaciones & ¿Qué tan rápido y qué tan grande será? \\
+			& Campos y formas & ¿Qué documentos y colecciones se crean exactamente? \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	\subsubsection{Embeber o referenciar}
+	\begin{table}[H]
+		\centering
+		\caption{Criterios para decidir entre embeber y referenciar}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.6cm}YY}
+			\toprule
+			\textbf{Criterio} & \textbf{Embeber (subdocumento o arreglo)} & \textbf{Referenciar (otra colección)} \\
+			\midrule
+			Cardinalidad & 1:1 o 1 a pocos. & 1 a muchos sin límite, o N:M. \\
+			Acceso & Se lee casi siempre junto con el padre. & Se consulta por separado. \\
+			Cambio & Cambia poco. & Cambia con frecuencia o tiene ciclo de vida propio. \\
+			Crecimiento & Acotado. & Puede superar los 16\,MB si se incrusta. \\
+			Consistencia & Se actualiza de forma atómica con el padre. & Requiere transacciones o consistencia eventual. \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	\subsubsection{Patrones de diseño}
+	\begin{table}[H]
+		\centering
+		\caption{Patrones de diseño documental}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.3cm}Y>{\raggedright\arraybackslash}p{3cm}}
+			\toprule
+			\textbf{Patrón} & \textbf{Idea} & \textbf{En el proyecto} \\
+			\midrule
+			Referencia extendida & Copiar en el documento los pocos campos de otro documento que siempre se necesitan, evitando uniones. & Sí (\textit{snapshots} en transacción) \\
+			Cálculo previo (\textit{Computed}) & Guardar resultados ya calculados para no recalcular en cada lectura. & Sí (\texttt{aristas\_flujo}) \\
+			Cubo (\textit{Bucket}) & Agrupar muchos datos pequeños de una serie en un solo documento por intervalo. & No \\
+			Subconjunto (\textit{Subset}) & Guardar en el documento principal solo los datos más usados. & No \\
+			Versionado de esquema & Registrar la versión del esquema para convivir con documentos antiguos y nuevos. & Sí (\texttt{version\_esquema}) \\
+			Polimórfico & Documentos de formas distintas en una misma colección. & No \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	\subsubsection{Formas (\textit{shapes}) de los documentos}
+	La forma de un documento describe su estructura: si es plano o tiene subdocumentos, y si contiene arreglos y de qué tamaño. Un ejemplo sencillo: un documento \textit{Vuelo} tiene una forma plana, con campos escalares y sin arreglos grandes; un documento \textit{Reserva} tiene un subdocumento \textit{pasajero} o un arreglo de pasajeros. Describir las formas permite revisar a simple vista si el diseño evita arreglos que crecen sin límite.
+	
+	% =====================================================================
+	\section{Desarrollo}
+	
+	% ---------------------------------------------------------------------
+	\subsection{Mapa de contexto}
+	En la arquitectura empresarial de Yape Bolivia, el sistema de prevención de fraude no opera de manera aislada, sino como un contexto delimitado central (\textit{Core Domain}) que interactúa con los sistemas transaccionales del Banco de Crédito de Bolivia (BCP). Se identifican cuatro contextos delimitados principales:
+	\begin{itemize}[leftmargin=2em]
+		\item \textbf{Prevención y Detección de Fraude (\textit{Core Domain}):} subsistema encargado de validar listas negras en tiempo real, calcular el puntaje de riesgo transaccional, ingerir eventos inmutables y detectar anillos de fraude y cuentas fantasma mediante MongoDB y Redis.
+		\item \textbf{Core de Pagos y Transferencias QR (\textit{Supporting Domain}):} pasarela transaccional que procesa las solicitudes de envío de dinero P2P, verifica saldos contables (ACID) y consulta al motor antifraude antes de liquidar el pago.
+		\item \textbf{Gestión de Identidad y Dispositivos (\textit{Supporting Domain}):} subsistema de enrolamiento que registra a los usuarios, valida documentos de identidad (CI) y captura la huella digital de los teléfonos y dispositivos móviles vinculados.
+		\item \textbf{Atención al Cliente y Denuncias (\textit{Generic/Supporting Domain}):} canal mediante el cual los usuarios reportan cuentas sospechosas o intentos de estafa para su investigación forense.
+	\end{itemize}
+	
+	\begin{figure}[H]
+		\centering
+		\begin{tikzpicture}[
+			ctx/.style={draw,rounded corners=4pt,align=center,font=\small,minimum width=4.4cm,minimum height=1.5cm,fill=green!8},
+			core/.style={ctx,fill=red!15,very thick},
+			lab/.style={font=\scriptsize,fill=white,inner sep=1.5pt,align=center}]
+			\node[core] (PF) at (0,0) {Prevención y Detección\\de Fraude (\textit{Core Domain})\\{\scriptsize MongoDB + Redis}};
+			\node[ctx] (CP) at (8,0) {Core de Pagos y\\Transferencias QR\\{\scriptsize (\textit{Supporting Domain})}};
+			\node[ctx] (GI) at (0,-4) {Gestión de Identidad\\y Dispositivos\\{\scriptsize (\textit{Supporting Domain})}};
+			\node[ctx] (AC) at (8,-4) {Atención al Cliente\\y Denuncias\\{\scriptsize (\textit{Generic/Supporting})}};
+			\draw[-{Stealth},thick] (PF) -- node[lab]{OHS / ACL:\\consulta de autorización} (CP);
+			\draw[-{Stealth},thick] (GI) -- node[lab]{CP: altas\\y dispositivos} (PF);
+			\draw[-{Stealth},thick] (AC) -- node[lab,pos=0.45]{ACL: denuncias\\P2P} (PF);
+		\end{tikzpicture}
+		\caption{Mapa de contexto del subsistema de detección de fraude de Yape Bolivia.}
+	\end{figure}
+	
+	\begin{table}[H]
+		\centering
+		\caption{Relaciones de integración entre los contextos delimitados}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3cm}>{\raggedright\arraybackslash}p{3cm}>{\raggedright\arraybackslash}p{1.9cm}Y}
+			\toprule
+			\textbf{Contexto aguas arriba (U)} & \textbf{Contexto aguas abajo (D)} & \textbf{Patrón} & \textbf{Descripción de la integración} \\
+			\midrule
+			Prevención y Detección de Fraude & Core de Pagos y Transferencias QR & OHS / ACL & El motor antifraude expone un servicio de baja latencia ($<50$\,ms en Redis) para autorizar o rechazar pagos antes del débito. \\
+			Gestión de Identidad y Dispositivos & Prevención y Detección de Fraude & Cliente--Proveedor & Provee eventos de alta de usuarios, teléfonos y vinculación de nuevos \texttt{device\_id} para indexación documental. \\
+			Atención al Cliente y Denuncias & Prevención y Detección de Fraude & ACL & Traduce los reclamos de usuarios estafados en documentos de auditoría y alimenta las listas de bloqueo. \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	% ---------------------------------------------------------------------
+	\subsection{Diagrama de dominio}
+	El modelo de dominio captura las entidades, objetos de valor y relaciones conceptuales que permiten identificar tanto la compartición anómala de terminales físicos como la circulación estructurada de fondos entre cuentas puente.
+	
+	\begin{figure}[H]
+		\centering
+		\resizebox{\linewidth}{!}{%
+			\begin{tikzpicture}[
+				ent/.style={draw,rounded corners=3pt,align=center,font=\small,minimum width=3.6cm,minimum height=1.2cm,fill=yellow!20},
+				vo/.style={ent,fill=cyan!15},
+				prj/.style={ent,fill=gray!15},
+				lab/.style={font=\scriptsize,fill=white,inner sep=1.5pt,align=center}]
+				\node[ent] (DM) at (0,0) {{\scriptsize\guillemotleft Entidad\guillemotright}\\\textbf{DispositivoMovil}};
+				\node[ent] (CU) at (6,0) {{\scriptsize\guillemotleft Entidad\guillemotright}\\\textbf{CuentaUsuario}};
+				\node[vo]  (LT) at (12,0) {{\scriptsize\guillemotleft Value Object\guillemotright}\\\textbf{LineaTelefonica}};
+				\node[ent] (RE) at (0,-3.2) {{\scriptsize\guillemotleft Entidad\guillemotright}\\\textbf{ReporteEstafa}};
+				\node[ent] (TR) at (6,-3.2) {{\scriptsize\guillemotleft Entidad\guillemotright}\\\textbf{Transaccion}};
+				\node[vo]  (AF) at (12,-3.2) {{\scriptsize\guillemotleft Value Object\guillemotright}\\\textbf{AristaFlujo}};
+				\node[prj] (LN) at (0,-6.4) {{\scriptsize\guillemotleft Entidad\guillemotright}\\\textbf{ListaNegra}};
+				\node[ent] (AL) at (6,-6.4) {{\scriptsize\guillemotleft Entidad\guillemotright}\\\textbf{AlertaFraude}};
+				\draw[thick] (DM) -- node[lab]{1..* vincula} (CU);
+				\draw[thick] (LT) -- node[lab]{1..* registra} (CU);
+				\draw[thick] (CU) -- node[lab]{1..* realiza} (TR);
+				\draw[thick] (CU) -- node[lab,pos=0.5]{0..* reporta} (RE);
+				\draw[thick] (TR) -- node[lab]{actualiza} (AF);
+				\draw[thick] (TR) -- node[lab]{0..* dispara} (AL);
+				\draw[thick] (AL) -- node[lab]{genera} (LN);
+				\draw[thick] (RE) -- node[lab]{alimenta} (LN);
+		\end{tikzpicture}}
+		\caption{Diagrama del modelo de dominio completo para la detección de fraude en Yape Bolivia.}
+	\end{figure}
+	
+	% ---------------------------------------------------------------------
+	\subsection{Diagrama de agregados}
+	En Domain-Driven Design (DDD), cada agregado constituye una frontera de consistencia transaccional cerrada liderada por una única entidad raíz (\textit{Aggregate Root}). Siguiendo las reglas tácticas de modelado:
+	\begin{enumerate}[leftmargin=2em]
+		\item Los objetos de valor (\textit{Value Objects}) y entidades internas se encapsulan dentro del límite del agregado (implementados como subdocumentos y arreglos acotados en un único documento de MongoDB).
+		\item La comunicación entre agregados distintos se realiza exclusivamente mediante referencias por identidad (\texttt{ObjectId}) hacia sus raíces.
+		\item Las proyecciones de lectura (\texttt{aristas\_flujo}) y las estructuras en memoria de ultra baja latencia (Redis) actúan como vistas derivadas sincronizadas mediante eventos y servicios de dominio.
+	\end{enumerate}
+	
+	La Figura~\ref{fig:agregados} detalla la estructura interna de cada agregado y las referencias por identificador entre sus raíces, evitando acoplamientos directos.
+	
+	\begin{figure}[H]
+		\centering
+		\begin{tikzpicture}[
+			agg/.style={draw,rounded corners=3pt,align=left,font=\scriptsize,text width=5.6cm,inner sep=5pt,fill=yellow!10},
+			lab/.style={font=\scriptsize,fill=white,inner sep=1.5pt}]
+			\node[agg] (U) at (0,0) {\textbf{1. Agregado Usuario}\\[2pt]{\guillemotleft Aggregate Root\guillemotright} Usuario (\texttt{\_id})\\{\guillemotleft Value Object\guillemotright} Teléfonos [1..3] (String)\\{\guillemotleft Entidad interna\guillemotright} Dispositivos [1..4] (\texttt{device\_id})};
+			\node[agg] (T) at (8.4,0) {\textbf{2. Agregado Transacción}\\[2pt]{\guillemotleft Aggregate Root\guillemotright} Transacción (\texttt{\_id})\\{\guillemotleft Value Object\guillemotright} Snapshots emisor y receptor \{1:1\}\\{\guillemotleft Value Object\guillemotright} Geolocalización y riesgo \{1:1\}};
+			\node[agg] (R) at (0,-3.8) {\textbf{3. Agregado ReporteEstafa}\\[2pt]{\guillemotleft Aggregate Root\guillemotright} ReporteEstafa (\texttt{\_id})\\{\guillemotleft Value Object\guillemotright} Motivo, fecha y estado de revisión};
+			\node[agg] (A) at (8.4,-3.8) {\textbf{4. Agregado AlertaFraude}\\[2pt]{\guillemotleft Aggregate Root\guillemotright} AlertaFraude (\texttt{\_id})\\{\guillemotleft Value Object\guillemotright} Regla disparada, nivel y estado};
+			\draw[-{Stealth},thick] (T) -- node[lab]{ref: id\_usuario} (U);
+			\draw[-{Stealth},thick] (R) -- node[lab,pos=0.5]{ref: id\_denunciado} (U);
+			\draw[-{Stealth},thick] (R.north east) -- node[lab,pos=0.4]{ref: id\_transaccion} (T.south west);
+			\draw[-{Stealth},thick] (A) -- node[lab]{dispara / ref} (T);
+		\end{tikzpicture}
+		\caption{Diagrama táctico de los cuatro agregados del dominio y sus referencias por identidad.}
+		\label{fig:agregados}
+	\end{figure}
+	
+	Complementando los cuatro agregados transaccionales, la Tabla~\ref{tab:agregados} sintetiza las reglas de consistencia (invariantes) de cada agregado y su relación con las estructuras de lectura optimizada (\texttt{aristas\_flujo} en MongoDB y conjuntos/contadores en Redis).
+	
+	\begin{table}[H]
+		\centering
+		\caption{Especificación de agregados, composición interna e invariantes de negocio}
+		\label{tab:agregados}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}p{3.1cm}>{\raggedright\arraybackslash}p{2.6cm}Y}
+			\toprule
+			\textbf{Agregado / Vista} & \textbf{Raíz y componentes} & \textbf{Persistencia} & \textbf{Invariantes y reglas de consistencia} \\
+			\midrule
+			Usuario & Raíz: Usuario. Hijos: \texttt{dispositivos}, \texttt{telefonos} & Colección \texttt{usuarios} (MongoDB) & Un usuario debe tener al menos un teléfono principal y un CI único. La lista de dispositivos es acotada (1 a 4). \\
+			Transacción & Raíz: Transaccion. VO: \texttt{emisor}, \texttt{receptor}, \texttt{geolocalizacion} & Colección \texttt{transacciones} (MongoDB) & Estrictamente inmutable tras su creación. Conserva la instantánea (\textit{snapshot}) del estado de riesgo al momento del pago. \\
+			AlertaFraude & Raíz: AlertaFraude. VO: \texttt{tipo\_regla}, \texttt{nivel\_riesgo} & Colección \texttt{alertas\_fraude} (MongoDB) & Toda alerta de nivel CRITICO confirmada dispara la inserción del identificador en la lista negra de Redis. \\
+			ReporteEstafa & Raíz: ReporteEstafa. VO: \texttt{motivo}, \texttt{estado} & Colección \texttt{reportes\_estafa} (MongoDB) & Un usuario no puede reportarse a sí mismo; todo reporte se vincula a una transacción previa verificable. \\
+			Proyección de grafo y caché & Vista: AristaFlujo. Caché: \texttt{blacklist:*}, \texttt{velocity:*} & \texttt{aristas\_flujo} (MongoDB) y RAM (Redis) & Consistencia eventual: se actualizan automáticamente al confirmar una transacción o un bloqueo de seguridad. \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	% ----- ENTRADAS -----
+	\subsubsection*{ENTRADAS}
+	
+	\paragraph{A. Escenarios (casos de uso).} El sistema da soporte a ocho escenarios operativos y analíticos fundamentales dentro de Yape Bolivia:
+	\begin{enumerate}[leftmargin=2em]
+		\item Un usuario solicita transferir dinero a otra cuenta mediante código QR o número celular.
+		\item Un analista consulta todas las cuentas vinculadas a un mismo número de teléfono.
+		\item Un analista busca dispositivos móviles compartidos por múltiples usuarios (detección de cuentas fantasma).
+		\item El sistema verifica en tiempo real si una cuenta remitente, teléfono o dispositivo está en la lista negra antes de procesar el pago.
+		\item Un analista rastrea transferencias en círculo entre tres o más cuentas (detección de anillos de fraude).
+		\item El sistema solicita el cálculo del nivel de riesgo y frecuencia operativa de una transacción en curso.
+		\item Un analista consulta la ruta del flujo de dinero entre dos usuarios sin relación aparente.
+		\item Un usuario reporta una cuenta receptora por intento de estafa o cobro fraudulento.
+	\end{enumerate}
+	
+	\paragraph{B. Registros de producción y estadísticas.}
+	\textit{Estadísticas actuales de acceso:}
+	\begin{itemize}[leftmargin=2em]
+		\item 75\,\% de las consultas corresponden a verificaciones rápidas de listas de bloqueo y evaluación de riesgo por transacción en curso (absorbidas por Redis y lecturas indexadas).
+		\item 15\,\% corresponden a análisis forenses de conexiones, dispositivos compartidos y rutas entre cuentas realizados por analistas en MongoDB.
+		\item 10\,\% corresponden al registro de nuevos usuarios, teléfonos, dispositivos móviles y reportes.
+	\end{itemize}
+	\textit{Volumen de datos:}
+	\begin{itemize}[leftmargin=2em]
+		\item 3,5 millones de transferencias procesadas y almacenadas al mes (alrededor de 120\,000 registros al día).
+		\item 45 millones de operaciones y transacciones acumuladas en el último año.
+		\item 2,5 millones de cuentas activas y 3,8 millones de dispositivos vinculados anualmente.
+		\item Grafo consolidado con más de 55 millones de conexiones históricas en constante evaluación.
+	\end{itemize}
+	\textit{Tasa de crecimiento:}
+	\begin{itemize}[leftmargin=2em]
+		\item Las transferencias monetarias crecen a un ritmo constante de 120\,000 registros nuevos por día (estrictamente inmutables).
+		\item Los registros de dispositivos y teléfonos crecen de forma moderada con 4\,000 altas diarias.
+		\item Las relaciones de riesgo, alertas y bloqueos aumentan en 300 nuevos casos detectados por semana.
+	\end{itemize}
+	
+	\paragraph{C. Experto en el dominio del negocio (billeteras digitales -- Yape Bolivia).}
+	\begin{enumerate}[leftmargin=2em]
+		\item <<Necesitamos validar al instante si el dispositivo emisor o el número de destino están marcados como fraudulentos antes de autorizar cualquier pago.>>
+		\item <<Debemos identificar de inmediato si tres o más cuentas distintas están compartiendo el mismo teléfono o celular para crear identidades falsas.>>
+		\item <<Requerimos rastrear en pocos segundos la ruta del dinero cuando varios usuarios transfieren fondos en círculo para evadir controles.>>
+	\end{enumerate}
+	
+	\paragraph{D. Experto en modelado de datos NoSQL.}
+	\begin{enumerate}[leftmargin=2em]
+		\item <<Mantendremos las listas negras de dispositivos, cuentas y teléfonos en conjuntos (\textit{Sets}) de Redis para validar bloqueos en complejidad $O(1)$ (submilisegundo), complementados con índices \textit{multikey} en los documentos de usuario de MongoDB.>>
+		\item <<Diseñaremos documentos de usuario con arreglos acotados de dispositivos y teléfonos vinculados, permitiendo que una consulta con agregación (\texttt{\$unwind} y \texttt{\$group}) detecte identidades compartidas rápidamente.>>
+		\item <<Almacenaremos las transacciones como documentos independientes inmutables con referencias e instantáneas (\textit{snapshots}) de emisor y receptor, apoyándonos en una colección precalculada de aristas para rastrear flujos y ciclos de dinero mediante etapas \texttt{\$graphLookup}.>>
+	\end{enumerate}
+	
+	% ----- PROCESO -----
+	\subsubsection*{PROCESO}
+	
+	\paragraph{A. Carga de trabajo (\textit{workload}).}
+	\textit{Tamaño estimado de datos en MongoDB y Redis:}
+	\begin{itemize}[leftmargin=2em]
+		\item \textbf{Documento de usuario/cuenta:} aprox.\ 1,5\,KB (incluye datos personales, arreglos de teléfonos y dispositivos vinculados).
+		\item \textbf{Documento de transacción:} aprox.\ 0,8\,KB (incluye instantánea de emisor y receptor, monto, \textit{timestamp}, geolocalización, canal y \textit{score} de riesgo).
+		\item \textbf{Documento de alerta de fraude / reporte:} aprox.\ 1,2\,KB (incluye regla disparada, cuentas involucradas, nivel de riesgo y estado de auditoría).
+		\item \textbf{Documento de arista de flujo:} aprox.\ 0,25\,KB (resumen dirigido emisor--receptor con monto acumulado y conteo de operaciones).
+		\item \textbf{Entradas en Redis (listas negras y contadores):} aprox.\ 64 bytes por clave/miembro en memoria RAM.
+	\end{itemize}
+	\textit{Cuantificación de operaciones:}
+	\begin{itemize}[leftmargin=2em]
+		\item \textbf{Lecturas:} muy altas (verificación en Redis de listas de bloqueo, control de velocidad transaccional y consulta de estados de cuenta antes de cada pago).
+		\item \textbf{Escrituras:} altas (ingestión continua de 120\,000 transferencias diarias en MongoDB, incremento de contadores en Redis y altas de dispositivos).
+		\item \textbf{Actualizaciones:} bajas (cambios en el estado de cuentas bloqueadas, actualización de \texttt{aristas\_flujo} y resolución de alertas).
+	\end{itemize}
+	\textit{Cualificación de operaciones:}
+	\begin{itemize}[leftmargin=2em]
+		\item \textbf{Lectura crítica:} latencia ultrabaja (menor a 50\,ms) resuelta mediante Redis en memoria para validar en tiempo real si el dispositivo o cuenta tienen alertas o bloqueos antes de liberar el dinero.
+		\item \textbf{Escritura crítica:} consistencia y durabilidad garantizadas (\texttt{w: "majority"}) en MongoDB al registrar la transacción para asegurar la trazabilidad financiera y evitar registros duplicados.
+	\end{itemize}
+	
+	\paragraph{B. Relaciones (\textit{relationships}).}
+	\begin{table}[H]
+		\centering
+		\caption{Análisis de relaciones, cuantificación y decisión de modelado}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{1.7cm}>{\raggedright\arraybackslash}p{3.3cm}Y}
+			\toprule
+			\textbf{Relación} & \textbf{Cardinalidad} & \textbf{Cuantificación} & \textbf{Decisión técnica (embed vs.\ reference)} \\
+			\midrule
+			Usuario -- Dispositivo / Teléfono & 1:N acotada & Un usuario tiene de 1 a 4 dispositivos y de 1 a 3 teléfonos habitualmente. & \textbf{Incrustar (\textit{embed}):} se incrustan dentro de \texttt{usuarios} porque son pocos datos, casi nunca cambian y permiten leer el perfil completo en una sola operación sin \textit{joins}. \\
+			Usuario -- Transacción & 1:N ilimitada & Un usuario genera cientos o miles de transacciones a lo largo del tiempo. & \textbf{Referenciar + \textit{snapshot}:} se modelan en la colección independiente \texttt{transacciones} porque crecen sin límite y superarían los 16\,MB. Se incrusta una instantánea mínima de emisor y receptor para que el historial sea inmutable. \\
+			Transacción -- Alerta de fraude & 1:N baja & Una transacción tiene 0 o muy pocas alertas asociadas (1 a 2). & \textbf{Referenciar:} se almacena en \texttt{alertas\_fraude} con referencia a \texttt{id\_transaccion} e \texttt{id\_usuario\_sospechoso}, dado que su ciclo de vida pertenece al flujo de trabajo de los analistas. \\
+			Alerta -- Lista negra activa & 1:1 operativa & Crece en 300 casos nuevos por semana. & \textbf{Duplicación en Redis (\textit{cache-aside}):} los identificadores bloqueados se cargan en conjuntos de Redis (\texttt{blacklist:*}) para lecturas en $<1$\,ms. \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	% ----- SALIDA -----
+	\subsubsection*{SALIDA: ESQUEMA}
+	
+	\paragraph{A. Supuestos.}
+	\begin{itemize}[leftmargin=2em]
+		\item Toda transacción registrada en MongoDB es definitiva e inmutable; nunca se edita ni se borra físicamente.
+		\item La aplicación móvil de Yape Bolivia envía siempre un identificador único de hardware (\texttt{device\_id}) y telemetría confiable en cada solicitud.
+		\item Toda inserción de bloqueo confirmada en MongoDB se replica de forma inmediata en los conjuntos en memoria de Redis mediante el servicio de dominio.
+	\end{itemize}
+	
+	\paragraph{B. Consultas (\textit{queries}).}
+	A continuación se presentan las consultas en Redis y MongoDB que resuelven los escenarios planteados.
+	
+	\textbf{Consulta 1. Verificación instantánea de lista negra y control de velocidad en Redis (Escenarios 1, 4 y 6):}
+	\begin{lstlisting}
+		# Verificar en O(1) si dispositivo, emisor o telefono destino estan bloqueados
+		SISMEMBER blacklist:devices "DEV-XYZ-987"
+		SISMEMBER blacklist:users "650000000000000000000101"
+		SISMEMBER blacklist:phones "+59170011223"
+		
+		# Control de rafaga (velocity check): maximo 5 transferencias por minuto
+		INCR velocity:tx:650000000000000000000101
+		EXPIRE velocity:tx:650000000000000000000101 60
+	\end{lstlisting}
+	
+	\textbf{Consulta 2. Dispositivo móvil vinculado a más de una cuenta (Escenario 3):}
+	\begin{lstlisting}
+		db.usuarios.find(
+		{ "dispositivos.device_id": "DEV-XYZ-987" },
+		{ _id: 1, nombre_completo: 1, telefono_principal: 1, estado_cuenta: 1 }
+		)
+	\end{lstlisting}
+	
+	\textbf{Consulta 3. Dispositivos compartidos por 3 o más cuentas (Escenarios 2 y 3):}
+	\begin{lstlisting}
+		db.usuarios.aggregate([
+		{ $unwind: "$dispositivos" },
+		{ $group: {
+				_id: "$dispositivos.device_id",
+				total_cuentas: { $sum: 1 },
+				usuarios_vinculados: { $push: { id: "$_id", nombre: "$nombre_completo" } }
+		}},
+		{ $match: { total_cuentas: { $gte: 3 } } },
+		{ $sort: { total_cuentas: -1 } }
+		])
+	\end{lstlisting}
+	
+	\textbf{Consulta 4. Últimas 20 transacciones de un usuario (auditoría del Escenario 1):}
+	\begin{lstlisting}
+		db.transacciones.find({
+			$or: [
+			{ "emisor.id_usuario": ObjectId("650000000000000000000101") },
+			{ "receptor.id_usuario": ObjectId("650000000000000000000101") }
+			]
+		}).sort({ fecha_hora: -1 }).limit(20)
+	\end{lstlisting}
+	
+	\textbf{Consulta 5. Transferencias en círculo y rutas de dinero con \texttt{\$graphLookup} (Escenarios 5 y 7):}
+	\begin{lstlisting}
+		db.aristas_flujo.aggregate([
+		{ $match: { id_emisor: ObjectId("650000000000000000000101") } },
+		{ $graphLookup: {
+				from: "aristas_flujo",
+				startWith: "$id_receptor",
+				connectFromField: "id_receptor",
+				connectToField: "id_emisor",
+				as: "cadena_transferencias",
+				maxDepth: 3,
+				depthField: "nivel_salto"
+		}},
+		{ $match: {
+				"cadena_transferencias.id_receptor": ObjectId("650000000000000000000101")
+		}}
+		])
+	\end{lstlisting}
+	
+	\textbf{Consulta 6. Alertas de nivel crítico de las últimas 24 horas (Escenarios 6 y 8):}
+	\begin{lstlisting}
+		db.alertas_fraude.find({
+			nivel_riesgo: "CRITICO",
+			estado: "PENDIENTE",
+			fecha_deteccion: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+		})
+	\end{lstlisting}
+	
+	\paragraph{C. Índices.}
+	\begin{table}[H]
+		\centering
+		\caption{Estrategia de indexación en MongoDB y estructuras de acceso en Redis}
+		\label{tab:indices}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}p{4.6cm}>{\raggedright\arraybackslash}p{2.1cm}Y}
+			\toprule
+			\textbf{Colección o motor} & \textbf{Definición de índice / clave} & \textbf{Tipo} & \textbf{Escenario que optimiza} \\
+			\midrule
+			\texttt{usuarios} & \texttt{\{"dispositivos.device\_id": 1\}} & \textit{Multikey} & Escenario 3: búsqueda rápida de cuentas que comparten celular. \\
+			\texttt{usuarios} & \texttt{\{"telefonos": 1\}} & \textit{Multikey} & Escenario 2: cuentas vinculadas a un mismo número telefónico. \\
+			\texttt{usuarios} & \texttt{\{"ci\_documento": 1\}} & Único & Garantiza unicidad del documento de identidad en el enrolamiento. \\
+			\texttt{transacciones} & \texttt{\{"emisor.id\_usuario": 1, "fecha\_hora": -1\}} & Compuesto & Historial cronológico de envíos por usuario sin COLLSCAN. \\
+			\texttt{transacciones} & \texttt{\{"receptor.id\_usuario": 1, "fecha\_hora": -1\}} & Compuesto & Historial cronológico de recepciones por usuario. \\
+			\texttt{aristas\_flujo} & \texttt{\{"id\_emisor": 1, "id\_receptor": 1\}} & Compuesto único & Escenarios 5 y 7: acelera los saltos recursivos de \texttt{\$graphLookup}. \\
+			\texttt{alertas\_fraude} & \texttt{\{"nivel\_riesgo": 1, "estado": 1, "fecha\_deteccion": -1\}} & Compuesto (ESR) & Bandeja de alertas críticas de las últimas 24 horas (regla Igualdad--Orden--Rango). \\
+			Redis & \texttt{blacklist:devices}, \texttt{blacklist:users}, \texttt{blacklist:phones} & \textit{Hash table} (Set) & Escenario 4: validación de lista negra en $<1$\,ms ($O(1)$). \\
+			Redis & \texttt{velocity:tx:}\allowbreak\texttt{<id\_usuario>} & String + TTL & Escenario 6: conteo de ráfagas de transferencias por minuto. \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	\paragraph{D. Dimensionamiento teórico y entorno de simulación local.}
+	Con el fin de analizar la viabilidad del modelo ante la escala del negocio de Yape Bolivia, se realiza un cálculo teórico del volumen anual proyectado, diferenciando la escala estimada del problema frente al entorno de desarrollo y pruebas en el que se ejecuta la simulación académica.
+	
+	\begin{table}[H]
+		\centering
+		\caption{Estimación teórica de volumen anual frente al entorno de simulación local}
+		\label{tab:dimension}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.8cm}>{\raggedright\arraybackslash}p{2.9cm}>{\raggedright\arraybackslash}p{1.6cm}>{\raggedright\arraybackslash}p{2.6cm}Y}
+			\toprule
+			\textbf{Colección / componente} & \textbf{Escala negocio (teórica)} & \textbf{Tamaño unit.} & \textbf{Almacenamiento teórico anual} & \textbf{Muestra prototipo (laptop local)} \\
+			\midrule
+			\texttt{usuarios} (MongoDB) & 2\,500\,000 docs & 1,50\,KB & $\sim$4,69\,GB (con índices) & 5\,000 a 10\,000 docs \\
+			\texttt{transacciones} & 45\,000\,000 docs & 0,80\,KB & $\sim$45,00\,GB (con índices) & 50\,000 a 100\,000 docs \\
+			\texttt{aristas\_flujo} & 55\,000\,000 docs & 0,25\,KB & $\sim$17,19\,GB (con índices) & Grafo sintético reducido \\
+			\texttt{alertas\_fraude} & 150\,000 docs & 1,20\,KB & $\sim$0,23\,GB & Casos de prueba sembrados \\
+			Redis (en memoria) & 500\,000 claves & 64\,B & $\sim$50\,MB (RAM teórica) & $<5$\,MB (RAM local) \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	\textbf{Delimitación del alcance técnico.} El dimensionamiento expuesto en la Tabla~\ref{tab:dimension} representa el volumen que enfrentaría el subsistema en un entorno productivo real. Sin embargo, para fines de este proyecto académico, la solución se implementa y evalúa como un prototipo funcional sobre una computadora portátil de desarrollo estándar, ejecutando instancias locales de MongoDB y Redis, sin incurrir en costos ni dependencias de infraestructura externa.
+	
+	\textbf{Carga en memoria del prototipo.} La estructura en memoria de Redis para validar listas negras ($O(1)$) requiere menos de 5\,MB de RAM en el entorno local, lo que permite validar los tiempos de respuesta inmediatos ($<50$\,ms) sin comprometer los recursos de la máquina de desarrollo.
+	
+	\paragraph{E. Operaciones y carga de trabajo simulada.}
+	En concordancia con el perfil de carga estimado (75\,\% verificaciones rápidas, 15\,\% analítica forense y 10\,\% registros de identidad):
+	\begin{itemize}[leftmargin=2em]
+		\item \textbf{Verificación en tiempo real (Redis):} el prototipo evalúa las consultas de pertenencia en listas de exclusión (\texttt{SISMEMBER}) y control de frecuencia con expiración (\texttt{INCR} + \texttt{EXPIRE}) directamente sobre la memoria RAM local, demostrando la viabilidad de resolver validaciones en submilisegundos antes de autorizar el flujo transaccional.
+		\item \textbf{Ingestión y consultas analíticas (MongoDB):} las operaciones de inserción de transacciones y los \textit{pipelines} de detección recursiva (\texttt{\$graphLookup}) se ejecutan sobre una muestra sintética representativa de datos generada localmente, verificando el funcionamiento de los índices \textit{multikey} y la detección de ciclos sin saturar el almacenamiento del equipo.
+	\end{itemize}
+	
+	\paragraph{G. Campos: definición de colecciones y esquemas.}
+	A continuación se definen los esquemas de las colecciones en MongoDB y las estructuras en Redis.
+	
+	\begin{lstlisting}
+		// 1. Coleccion: usuarios (MongoDB)
+		{
+			"_id": ObjectId,
+			"nombre_completo": String,
+			"ci_documento": String,
+			"telefono_principal": String,
+			"telefonos": [ String ],
+			"email": String,
+			"estado_cuenta": String,      // "ACTIVA", "SUSPENDIDA", "BLOQUEADA"
+			"score_riesgo": Number,       // 0 a 100
+			"fecha_registro": ISODate,
+			"version_esquema": Number,
+			"dispositivos": [
+			{ "device_id": String, "modelo": String, "sistema_operativo": String,
+				"fecha_vinculacion": ISODate, "es_bloqueado": Boolean }
+			]
+		}
+		
+		// 2. Coleccion: transacciones (MongoDB - Inmutable)
+		{
+			"_id": ObjectId,
+			"codigo_transaccion": String,
+			"monto": Number,
+			"moneda": String,             // "BOB"
+			"tipo_operacion": String,     // "P2P_QR", "P2P_CELULAR"
+			"canal": String,              // "APP_ANDROID", "APP_IOS"
+			"fecha_hora": ISODate,
+			"estado": String,             // "COMPLETADA", "RECHAZADA_FRAUDE"
+			"riesgo_calculado": Number,
+			"geolocalizacion": { "lat": Number, "lon": Number },
+			"emisor": { "id_usuario": ObjectId, "nombre": String, "telefono": String,
+				"device_id_origen": String, "score_riesgo_momento": Number },
+			"receptor": { "id_usuario": ObjectId, "nombre": String, "telefono": String }
+		}
+		
+		// 3. Coleccion: alertas_fraude (MongoDB)
+		{
+			"_id": ObjectId,
+			"id_transaccion": ObjectId,
+			"id_usuario_sospechoso": ObjectId,
+			"tipo_regla": String,   // "DISPOSITIVO_COMPARTIDO", "ANILLO_CIRCULAR", "VELOCIDAD"
+			"nivel_riesgo": String, // "BAJO", "MEDIO", "CRITICO"
+			"detalle": String,
+			"estado": String,       // "PENDIENTE", "CONFIRMADO", "FALSO_POSITIVO"
+			"fecha_deteccion": ISODate
+		}
+		
+		// 4. Coleccion: aristas_flujo (MongoDB - patron Computed para $graphLookup)
+		{
+			"_id": ObjectId,
+			"id_emisor": ObjectId,
+			"id_receptor": ObjectId,
+			"monto_acumulado": Number,
+			"cantidad_tx": Number,
+			"ultima_fecha": ISODate
+		}
+		
+		// 5. Coleccion: reportes_estafa (MongoDB - Escenario 8)
+		{
+			"_id": ObjectId,
+			"id_usuario_denunciante": ObjectId,
+			"id_usuario_denunciado": ObjectId,
+			"id_transaccion": ObjectId,
+			"motivo": String,
+			"fecha_reporte": ISODate,
+			"estado_revision": String
+		}
+		
+		// 6. Estructuras clave-valor en Redis
+		blacklist:devices -> Set { "DEV-XYZ-987", "DEV-ABC-111", ... }
+		blacklist:users   -> Set { "650000000000000000000101", ... }
+		blacklist:phones  -> Set { "+59170011223", "+59160099887", ... }
+		velocity:tx:<id_usuario> -> String (contador entero con TTL = 60 s)
+	\end{lstlisting}
+	
+	Adicionalmente, el modelo de datos en memoria para Redis se estructura bajo una convención de nombres jerárquica por espacios de claves (\textit{keyspaces}) separada por dos puntos (\texttt{:}), detallada en la Tabla~\ref{tab:redis}.
+	
+	\begin{table}[H]
+		\centering
+		\caption{Definición del esquema clave-valor y estructuras de datos en Redis}
+		\label{tab:redis}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.4cm}>{\raggedright\arraybackslash}p{1.7cm}>{\raggedright\arraybackslash}p{1.9cm}Y}
+			\toprule
+			\textbf{Patrón de clave} & \textbf{Tipo} & \textbf{TTL} & \textbf{Valor y propósito en el dominio} \\
+			\midrule
+			\texttt{blacklist:devices} & Set & Persistente (sin TTL) & Conjunto desordenado de identificadores únicos de hardware (por ejemplo, \texttt{"DEV-XYZ-987"}). Evalúa dispositivos bloqueados en $O(1)$. \\
+			\texttt{blacklist:users} & Set & Persistente (sin TTL) & Conjunto de identificadores \texttt{ObjectId} de cuentas suspendidas o confirmadas como parte de un anillo de fraude. \\
+			\texttt{blacklist:phones} & Set & Persistente (sin TTL) & Conjunto de números telefónicos (por ejemplo, \texttt{"+59170011223"}) reportados por intentos de estafa o cuentas fantasma. \\
+			\texttt{velocity:tx:}\allowbreak\texttt{<id\_usuario>} & String (contador) & Volátil (60\,s) & Valor entero atómico incrementado mediante \texttt{INCR} en cada transferencia emitida. Controla ráfagas anómalas de vaciado de fondos. \\
+			\texttt{risk:score:}\allowbreak\texttt{<id\_usuario>} & String (caché) & Volátil (300\,s) & Puntaje de riesgo precalculado (0 a 100) almacenado temporalmente para evitar lecturas repetitivas al documento de usuario en MongoDB. \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	\paragraph{H. Formas (\textit{shapes}).}
+	La geometría de los documentos garantiza que ningún arreglo crezca de manera ilimitada: los arreglos dentro de \texttt{usuarios} están acotados a $[1..4]$ elementos, mientras que \texttt{transacciones}, \texttt{alertas\_fraude} y \texttt{aristas\_flujo} tienen formas planas o con subdocumentos de cardinalidad $1:1$.
+	
+	\begin{figure}[H]
+		\centering
+		\begin{tikzpicture}[
+			col/.style={draw,rounded corners=3pt,align=left,font=\scriptsize,text width=5.6cm,inner sep=5pt,fill=yellow!10}]
+			\node[col] (u) at (0,0) {\textbf{1. usuarios}\\- \_id, nombre, ci\\- estado, score\_riesgo\\- version\_esquema\\\textbf{telefonos [1..3]} - String (arreglo acotado)\\\textbf{dispositivos [1..4]} - device\_id, modelo, so, es\_bloqueado};
+			\node[col] (t) at (8.2,0) {\textbf{2. transacciones}\\- \_id, codigo, monto\\- fecha\_hora, canal\\- riesgo\_calculado\\\textbf{emisor \{1:1\}} - id\_usuario, nombre, device\_id\_origen\\\textbf{receptor \{1:1\}} - id\_usuario, nombre\\\textbf{geolocalizacion \{1:1\}} - lat, lon};
+			\node[col,fill=green!8] (a) at (-2.9,-4.2) {\textbf{3. alertas\_fraude (plana)}\\- \_id, id\_transaccion\\- id\_usuario\_sospechoso\\- tipo\_regla, nivel\_riesgo};
+			\node[col,fill=green!8] (g) at (3.0,-4.2) {\textbf{4. aristas\_flujo (plana)}\\- \_id, id\_emisor\\- id\_receptor, cantidad\_tx\\- monto\_acumulado};
+			\node[col,fill=green!8] (r) at (8.9,-4.2) {\textbf{5. reportes\_estafa (plana)}\\- \_id, id\_denunciante\\- id\_denunciado, id\_tx\\- motivo, estado\_revision};
+		\end{tikzpicture}
+		\caption{Formas (\textit{shapes}) de las cinco colecciones documentales definidas en MongoDB.}
+	\end{figure}
+	
+	% ---------------------------------------------------------------------
+	\subsection{Diagrama de eventos}
+	Los eventos de dominio permiten desacoplar la validación síncrona del análisis forense asíncrono, manteniendo sincronizados los estados entre MongoDB y Redis.
+	
+	\begin{figure}[H]
+		\centering
+		\begin{tikzpicture}[
+			ev/.style={draw,rounded corners=3pt,align=center,font=\scriptsize,text width=3.6cm,minimum height=0.9cm,fill=orange!25},
+			pr/.style={draw,rounded corners=3pt,align=center,font=\scriptsize,text width=3.8cm,minimum height=0.9cm,fill=blue!10},
+			lab/.style={font=\scriptsize,fill=white,inner sep=1.5pt}]
+			\node[ev] (E1) at (4,0) {Evento:\\TransferenciaSolicitada};
+			\node[pr] (P1) at (4,-1.8) {Evalúa en Redis\\(SISMEMBER + INCR)};
+			\node[ev] (E2) at (0,-4) {Evento:\\PagoAutorizado};
+			\node[ev] (E3) at (8,-4) {Evento:\\AlertaFraudeGenerada};
+			\node[pr] (P2) at (0,-5.8) {Inserta transacciones\\y actualiza aristas\_flujo};
+			\node[pr] (P3) at (8,-5.8) {Registra alertas\_fraude\\y ejecuta SADD en Redis};
+			\node[ev] (E4) at (4,-8) {Evento:\\EstafaReportada};
+			\node[pr] (P4) at (4,-9.7) {Guarda en\\reportes\_estafa};
+			\draw[-{Stealth},thick] (E1) -- (P1);
+			\draw[-{Stealth},thick] (P1) -- node[lab,pos=0.55]{Riesgo bajo} (E2);
+			\draw[-{Stealth},thick] (P1) -- node[lab,pos=0.55]{Riesgo crítico} (E3);
+			\draw[-{Stealth},thick] (E2) -- (P2);
+			\draw[-{Stealth},thick] (E3) -- (P3);
+			\draw[-{Stealth},thick] (P3) -- node[lab,pos=0.5]{Escala a revisión} (E4);
+			\draw[-{Stealth},thick] (E4) -- (P4);
+		\end{tikzpicture}
+		\caption{Diagrama de eventos de dominio y sincronización entre Redis y MongoDB.}
+	\end{figure}
+	
+	% ---------------------------------------------------------------------
+	\subsection{Diagrama de servicios de dominio}
+	La lógica que coordina múltiples agregados o ambas bases de datos se encapsula en tres servicios de dominio:
+	\begin{enumerate}[leftmargin=2em]
+		\item \textbf{ServicioEvaluadorRiesgo:} consulta en Redis si el emisor, receptor o dispositivo están en lista negra, evalúa el contador de velocidad transaccional y calcula el puntaje de riesgo en $<50$\,ms.
+		\item \textbf{ServicioDetectorAnillos:} ejecuta periódicamente o bajo demanda los \textit{pipelines} \texttt{\$graphLookup} sobre \texttt{aristas\_flujo} y las agregaciones \textit{multikey} sobre \texttt{usuarios} para descubrir anillos circulares y dispositivos clonados.
+		\item \textbf{ServicioGestorBloqueos:} cuando un analista confirma una alerta o un reporte de estafa en MongoDB, actualiza el estado del usuario y publica inmediatamente el \texttt{device\_id}, teléfono o cuenta en los conjuntos de Redis (\texttt{SADD}).
+	\end{enumerate}
+	
+	\begin{figure}[H]
+		\centering
+		\begin{tikzpicture}[
+			sv/.style={draw,rounded corners=3pt,align=center,font=\scriptsize,text width=3.6cm,minimum height=1.1cm,fill=yellow!20},
+			db/.style={draw,rounded corners=3pt,align=center,font=\scriptsize,text width=4.6cm,minimum height=1.4cm,fill=gray!15},
+			lab/.style={font=\scriptsize,fill=white,inner sep=1.5pt,align=center}]
+			\node[sv] (S3) at (0,0) {ServicioGestorBloqueos\\(Escenarios 4 y 8)};
+			\node[sv] (S1) at (5.8,0) {ServicioEvaluadorRiesgo\\(Escenarios 1, 4 y 6)};
+			\node[sv] (S2) at (11.6,0) {ServicioDetectorAnillos\\(Escenarios 2, 3, 5 y 7)};
+			\node[db] (RD) at (1.5,-4.5) {\textbf{Redis (en memoria local)}\\blacklist:devices / users / phones\\velocity:tx:<id\_usuario>};
+			\node[db] (MG) at (10,-4.5) {\textbf{MongoDB (documental local)}\\usuarios, transacciones,\\aristas\_flujo, alertas\_fraude,\\reportes\_estafa};
+			\draw[-{Stealth},thick] (S1) -- node[lab,pos=0.4,above left]{Lee $O(1)$\\SISMEMBER / INCR} (RD);
+			\draw[-{Stealth},thick] (S1) -- node[lab,pos=0.6]{Inserta Tx} (MG);
+			\draw[-{Stealth},thick] (S2) -- node[lab]{\$graphLookup\\y multikey} (MG);
+			\draw[-{Stealth},thick] (S3) -- node[lab,pos=0.5]{SADD bloqueo} (RD);
+			\draw[-{Stealth},thick] (S3) to[bend right=35] node[lab,pos=0.5,below]{Registra alerta/reporte} (MG);
+		\end{tikzpicture}
+		\caption{Diagrama de servicios de dominio e interacción con las colecciones de MongoDB y Redis.}
+	\end{figure}
+	
+	% ---------------------------------------------------------------------
+	\subsection{Diagrama de escenarios}
+	La Figura~\ref{fig:secuencia} ilustra la secuencia de interacción de extremo a extremo para el flujo crítico de validación de una transferencia en tiempo real (Escenarios 1, 4 y 6), seguido del reporte de estafa y la auditoría analítica de anillos de fraude (Escenarios 3, 5 y 8).
+	
+	\begin{figure}[H]
+		\centering
+		\resizebox{\linewidth}{!}{%
+			\begin{tikzpicture}
+				\lifeline{0}{App / Core Yape}{-9.4}
+				\lifeline{5.5}{Motor Antifraude}{-9.4}
+				\lifeline{11}{Redis (RAM local)}{-9.4}
+				\lifeline{16.5}{MongoDB local}{-9.4}
+				\msg{0}{5.5}{-1.0}{1. Solicita validar pago QR}{thick}
+				\msg{5.5}{11}{-1.8}{2. SISMEMBER (blacklist) + INCR (velocity)}{thick}
+				\msg{11}{5.5}{-2.6}{3. Respuesta en memoria OK ($<2$\,ms)}{dashed}
+				\msg{5.5}{16.5}{-3.4}{4. Inserta transacción y actualiza aristas\_flujo}{thick}
+				\msg{5.5}{0}{-4.2}{5. Pago autorizado ($<50$\,ms)}{dashed}
+				\msg{0}{5.5}{-5.2}{6. Usuario reporta cuenta por estafa (Esc.\ 8)}{thick}
+				\msg{5.5}{16.5}{-6.0}{7. Registra reporte\_estafa y ejecuta \$graphLookup}{thick}
+				\msg{16.5}{5.5}{-6.8}{8. Detecta ciclo / dispositivo compartido y crea alerta}{dashed}
+				\msg{5.5}{11}{-7.6}{9. SADD blacklist (bloqueo inmediato en Redis)}{thick}
+		\end{tikzpicture}}
+		\caption{Diagrama de secuencia integral: validación en tiempo real, reporte de estafa y detección de anillos.}
+		\label{fig:secuencia}
+	\end{figure}
+	
+	% =====================================================================
+	\section{Implementación}
+	Esta sección documenta la construcción del prototipo funcional descrito en la Sección~5. Toda la solución se ejecuta como procesos locales en una computadora portátil de desarrollo: no se utiliza infraestructura externa ni servicios remotos de ningún tipo. Los \textit{scripts} se organizan en una carpeta de proyecto \texttt{fraude\_yape/} con los archivos \texttt{01\_esquema.js}, \texttt{generar\_datos.py}, \texttt{servicios.py}, \texttt{demo\_escenarios.py} y \texttt{benchmark.py}.
+	
+	\subsection{Entorno de trabajo}
+	\begin{table}[H]
+		\centering
+		\caption{Componentes del entorno local}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{2.6cm}Y}
+			\toprule
+			\textbf{Componente} & \textbf{Versión mínima} & \textbf{Función en el proyecto} \\
+			\midrule
+			MongoDB Community Server (\texttt{mongod}) & 6.0 & Almacenamiento documental duradero y consultas analíticas (\texttt{\$graphLookup}, agregaciones). \\
+			MongoDB Shell (\texttt{mongosh}) y Compass & Actual & Ejecución de \textit{scripts} de esquema, consultas y planes de ejecución (\texttt{explain}). Compass es opcional y sirve para inspeccionar visualmente las colecciones. \\
+			Redis Server (\texttt{redis-server}) y \texttt{redis-cli} & 7.0 & Listas negras (\textit{Sets}) y contadores de velocidad con TTL. Se requiere 7.0 o superior por la opción \texttt{NX} de \texttt{EXPIRE}. \\
+			Python con \texttt{pymongo} y \texttt{redis} & Python 3.10 & Generación de datos sintéticos, servicios de dominio y mediciones de latencia. \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	Los servidores se inician de forma local con la configuración por defecto (MongoDB en \texttt{localhost:27017} y Redis en \texttt{localhost:6379}):
+	\begin{lstlisting}
+		# Terminal 1: MongoDB con un directorio de datos local
+		mongod --dbpath ./datos_mongo
+		
+		# Terminal 2: Redis
+		redis-server
+		
+		# Terminal 3: dependencias de Python
+		pip install pymongo redis
+	\end{lstlisting}
+	
+	\textbf{Nota sobre transacciones y \textit{Change Streams}.} Una instancia \texttt{mongod} independiente no soporta transacciones multidocumento ni \textit{Change Streams}. Por ello el prototipo aplica la consistencia eventual definida en el diseño: la transacción se inserta con \texttt{w: "majority"} y la proyección \texttt{aristas\_flujo} se actualiza inmediatamente después mediante una operación atómica con \texttt{upsert}. Si se desea experimentar con \textit{Change Streams}, basta iniciar \texttt{mongod} como conjunto de réplicas de un solo nodo (\texttt{--replSet rs0} y \texttt{rs.initiate()}), lo que sigue siendo una configuración totalmente local.
+	
+	\subsection{Creación de la base, las colecciones y los índices}
+	El script \texttt{01\_esquema.js} se ejecuta con \texttt{mongosh --file 01\_esquema.js}. Crea la base \texttt{yape\_fraude}, las colecciones con validación de esquema JSON (que materializa las invariantes de la Tabla~\ref{tab:agregados}) y los índices de la Tabla~\ref{tab:indices}.
+	
+	\begin{lstlisting}
+		db = db.getSiblingDB("yape_fraude");
+		
+		db.createCollection("usuarios", { validator: { $jsonSchema: {
+					bsonType: "object",
+					required: ["nombre_completo","ci_documento","telefono_principal",
+					"telefonos","estado_cuenta","dispositivos","version_esquema"],
+					properties: {
+						nombre_completo:    { bsonType: "string" },
+						ci_documento:       { bsonType: "string" },
+						telefono_principal: { bsonType: "string", pattern: "^\\+591[67][0-9]{7}$" },
+						telefonos:   { bsonType: "array", minItems: 1, maxItems: 3,
+							items: { bsonType: "string" } },
+						estado_cuenta: { enum: ["ACTIVA","SUSPENDIDA","BLOQUEADA"] },
+						score_riesgo:  { bsonType: ["int","long","double"], minimum: 0, maximum: 100 },
+						dispositivos: { bsonType: "array", minItems: 1, maxItems: 4,
+							items: { bsonType: "object", required: ["device_id"],
+								properties: { device_id: { bsonType: "string" },
+									es_bloqueado: { bsonType: "bool" } } } }
+		} } } });
+		
+		db.createCollection("transacciones", { validator: { $jsonSchema: {
+					bsonType: "object",
+					required: ["codigo_transaccion","monto","moneda","fecha_hora",
+					"estado","emisor","receptor"],
+					properties: {
+						codigo_transaccion: { bsonType: "string" },
+						monto:  { bsonType: ["int","long","double"], minimum: 0 },
+						moneda: { enum: ["BOB"] },
+						fecha_hora: { bsonType: "date" },
+						estado: { enum: ["COMPLETADA","RECHAZADA_FRAUDE"] },
+						emisor:   { bsonType: "object", required: ["id_usuario","device_id_origen"] },
+						receptor: { bsonType: "object", required: ["id_usuario"] }
+		} } } });
+		
+		db.createCollection("alertas_fraude");
+		db.createCollection("aristas_flujo");
+		db.createCollection("reportes_estafa");
+		
+		// Indices (Tabla de indices) y dos complementos de integridad
+		db.usuarios.createIndex({ "dispositivos.device_id": 1 });
+		db.usuarios.createIndex({ telefonos: 1 });
+		db.usuarios.createIndex({ ci_documento: 1 }, { unique: true });
+		db.transacciones.createIndex({ "emisor.id_usuario": 1, fecha_hora: -1 });
+		db.transacciones.createIndex({ "receptor.id_usuario": 1, fecha_hora: -1 });
+		db.transacciones.createIndex({ codigo_transaccion: 1 }, { unique: true });
+		db.aristas_flujo.createIndex({ id_emisor: 1, id_receptor: 1 }, { unique: true });
+		db.alertas_fraude.createIndex({ nivel_riesgo: 1, estado: 1, fecha_deteccion: -1 });
+		db.reportes_estafa.createIndex({ id_usuario_denunciado: 1 });
+	\end{lstlisting}
+	
+	Los dos índices adicionales (\texttt{codigo\_transaccion} único y \texttt{id\_usuario\_denunciado}) complementan el diseño: el primero evita registros duplicados de una misma transferencia, requisito de la escritura crítica, y el segundo acelera la consulta de reportes contra una cuenta.
+	
+	\textbf{Inmutabilidad por permisos (opcional).} Si el servidor local se inicia con control de acceso (\texttt{--auth}), la invariante de inmutabilidad se refuerza con un rol que solo permite leer e insertar en \texttt{transacciones}:
+	\begin{lstlisting}
+		db.createRole({
+			role: "app_antifraude",
+			privileges: [
+			{ resource: { db: "yape_fraude", collection: "transacciones" },
+				actions: ["find","insert"] },
+			{ resource: { db: "yape_fraude", collection: "usuarios" },
+				actions: ["find","insert","update"] },
+			{ resource: { db: "yape_fraude", collection: "aristas_flujo" },
+				actions: ["find","insert","update"] },
+			{ resource: { db: "yape_fraude", collection: "alertas_fraude" },
+				actions: ["find","insert","update"] },
+			{ resource: { db: "yape_fraude", collection: "reportes_estafa" },
+				actions: ["find","insert","update"] }
+			],
+			roles: [] });
+	\end{lstlisting}
+	
+	\subsection{Generación de datos sintéticos y carga inicial de Redis}
+	El script \texttt{generar\_datos.py} produce una muestra representativa a la escala del prototipo (Tabla~\ref{tab:dimension}): 10\,000 usuarios y aproximadamente 100\,000 transacciones. Para que los resultados sean reproducibles se fija la semilla del generador aleatorio. El conjunto incluye casos de fraude \textbf{sembrados con tamaño conocido}, de modo que la detección pueda verificarse contra una verdad de referencia:
+	\begin{itemize}[leftmargin=2em]
+		\item cinco anillos de fraude de 3, 3, 4, 4 y 5 cuentas (19 cuentas en total); los miembros de cada anillo comparten un mismo \texttt{device\_id} y una misma línea telefónica secundaria, y se transfieren fondos en círculo en lapsos de pocos minutos;
+		\item veinte cuentas ya bloqueadas, cuyos identificadores, dispositivos y teléfonos se cargan en los conjuntos \texttt{blacklist:*} de Redis;
+		\item tráfico normal disperso: cada usuario tiene tres contactos frecuentes a los que transfiere, lo que produce un grafo ralo similar al de un uso cotidiano.
+	\end{itemize}
+	
+	\begin{lstlisting}
+		# generar_datos.py
+		import random
+		from datetime import datetime, timedelta, timezone
+		from bson import ObjectId
+		from pymongo import MongoClient, WriteConcern
+		import redis
+		
+		random.seed(42)
+		bd = MongoClient("mongodb://localhost:27017")["yape_fraude"]
+		r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+		
+		N_USUARIOS, N_TX, CONTACTOS = 10_000, 100_000, 3
+		TAM_ANILLOS, N_BLOQUEADOS = [3, 3, 4, 4, 5], 20
+		AHORA = datetime.now(timezone.utc)
+		MODELOS = ["Samsung A14", "Xiaomi Redmi 12", "Motorola G23", "iPhone 12"]
+		SISTEMAS = ["Android 13", "Android 14", "iOS 17"]
+		
+		# Limpieza para poder repetir la carga
+		for c in ["usuarios", "transacciones", "aristas_flujo",
+		"alertas_fraude", "reportes_estafa"]:
+		bd[c].delete_many({})
+		r.delete("blacklist:users", "blacklist:devices", "blacklist:phones")
+		
+		def crear_usuario(i):
+		tel = f"+5917{i:07d}"
+		return {"_id": ObjectId(), "nombre_completo": f"Usuario {i}",
+			"ci_documento": f"{4_000_000 + i} LP",
+			"telefono_principal": tel, "telefonos": [tel],
+			"email": f"u{i}@correo.test", "estado_cuenta": "ACTIVA",
+			"score_riesgo": random.randint(0, 30),
+			"fecha_registro": AHORA, "version_esquema": 1,
+			"dispositivos": [{"device_id": f"DEV-{i:07d}",
+				"modelo": random.choice(MODELOS),
+				"sistema_operativo": random.choice(SISTEMAS),
+				"fecha_vinculacion": AHORA,
+				"es_bloqueado": False}]}
+		
+		usuarios = [crear_usuario(i) for i in range(N_USUARIOS)]
+		
+		def crear_tx(cod, e, rc, monto, fecha):
+		return {"codigo_transaccion": cod, "monto": monto, "moneda": "BOB",
+			"tipo_operacion": random.choice(["P2P_QR", "P2P_CELULAR"]),
+			"canal": random.choice(["APP_ANDROID", "APP_IOS"]),
+			"fecha_hora": fecha, "estado": "COMPLETADA",
+			"riesgo_calculado": e["score_riesgo"],
+			"geolocalizacion": {"lat": -16.49 + random.uniform(-.05, .05),
+				"lon": -68.12 + random.uniform(-.05, .05)},
+			"emisor": {"id_usuario": e["_id"], "nombre": e["nombre_completo"],
+				"telefono": e["telefono_principal"],
+				"device_id_origen": e["dispositivos"][0]["device_id"],
+				"score_riesgo_momento": e["score_riesgo"]},
+			"receptor": {"id_usuario": rc["_id"],
+				"nombre": rc["nombre_completo"],
+				"telefono": rc["telefono_principal"]}}
+		
+		# 1) Anillos: dispositivo y linea compartidos + transferencias en circulo
+		txs, pos = [], 0
+		for k, tam in enumerate(TAM_ANILLOS):
+		miembros = usuarios[pos:pos + tam]; pos += tam
+		base = AHORA - timedelta(hours=2 + k)
+		for u in miembros:
+		u["dispositivos"][0]["device_id"] = f"DEV-SHARED-{k:02d}"
+		u["telefonos"].append(f"+591690000{k:02d}")
+		for j, e in enumerate(miembros):
+		rc = miembros[(j + 1) % tam]
+		txs.append(crear_tx(f"TRX-R{k}-{j}", e, rc, 4950 - 50 * j,
+		base + timedelta(minutes=3 * j)))
+		
+		# 2) Cuentas ya bloqueadas (se publican en Redis)
+		for u in usuarios[pos:pos + N_BLOQUEADOS]:
+		u["estado_cuenta"] = "BLOQUEADA"
+		u["dispositivos"][0]["es_bloqueado"] = True
+		r.sadd("blacklist:users", str(u["_id"]))
+		r.sadd("blacklist:devices", u["dispositivos"][0]["device_id"])
+		r.sadd("blacklist:phones", u["telefono_principal"])
+		
+		# 3) Trafico normal sobre un grafo ralo de contactos frecuentes
+		contactos = {i: random.sample([j for j in range(N_USUARIOS) if j != i],
+			CONTACTOS) for i in range(N_USUARIOS)}
+		for n in range(N_TX - len(txs)):
+		i = random.randrange(N_USUARIOS)
+		j = random.choice(contactos[i])
+		fecha = AHORA - timedelta(minutes=random.randint(0, 60 * 24 * 30))
+		txs.append(crear_tx(f"TRX-{n:07d}", usuarios[i], usuarios[j],
+		round(random.uniform(10, 800), 2), fecha))
+		
+		bd.usuarios.insert_many(usuarios)
+		tx_col = bd.transacciones.with_options(write_concern=WriteConcern(w="majority"))
+		for i in range(0, len(txs), 10_000):
+		tx_col.insert_many(txs[i:i + 10_000], ordered=False)
+		
+		# 4) Proyeccion aristas_flujo (patron Computed) a partir de las transacciones
+		bd.transacciones.aggregate([
+		{"$group": {"_id": {"e": "$emisor.id_usuario", "r": "$receptor.id_usuario"},
+				"monto_acumulado": {"$sum": "$monto"}, "cantidad_tx": {"$sum": 1},
+				"ultima_fecha": {"$max": "$fecha_hora"}}},
+		{"$project": {"_id": 0, "id_emisor": "$_id.e", "id_receptor": "$_id.r",
+				"monto_acumulado": 1, "cantidad_tx": 1, "ultima_fecha": 1}},
+		{"$merge": {"into": "aristas_flujo", "on": ["id_emisor", "id_receptor"],
+				"whenMatched": "replace", "whenNotMatched": "insert"}}])
+		
+		print("Usuarios:", bd.usuarios.count_documents({}),
+		"| Transacciones:", bd.transacciones.count_documents({}),
+		"| Aristas:", bd.aristas_flujo.count_documents({}),
+		"| Redis users:", r.scard("blacklist:users"))
+	\end{lstlisting}
+	
+	La etapa \texttt{\$merge} requiere el índice único sobre (\texttt{id\_emisor}, \texttt{id\_receptor}), creado previamente en \texttt{01\_esquema.js}.
+	
+	\subsection{Servicios de dominio}
+	Los tres servicios de dominio de la Sección~5.5 se implementan en \texttt{servicios.py}. Cada servicio recibe los clientes de Redis y MongoDB, de modo que la lógica queda separada de la infraestructura (patrón repositorio).
+	
+	\paragraph{ServicioEvaluadorRiesgo.} Agrupa en un único \textit{pipeline} de Redis las cuatro consultas de lista negra, el incremento del contador de velocidad y la lectura del puntaje en caché, de manera que la verificación completa cuesta un solo viaje de ida y vuelta al servidor. El contador usa \texttt{EXPIRE ... NX}: el TTL se fija solo cuando la clave nace, lo que produce una ventana fija de 60\,s y evita que cada transferencia reinicie la expiración (a diferencia de la secuencia \texttt{INCR} + \texttt{EXPIRE} sin condición de la Consulta~1, que mantendría viva la clave mientras haya tráfico).
+	
+	\begin{lstlisting}
+		# servicios.py
+		from datetime import datetime, timezone
+		from bson import ObjectId
+		from pymongo import WriteConcern
+		
+		class ServicioEvaluadorRiesgo:
+		LIMITE_VELOCIDAD = 5      # transferencias por minuto
+		UMBRAL_RECHAZO = 80       # riesgo >= 80 -> RECHAZADA_FRAUDE
+		
+		def __init__(self, r, bd):
+		self.r, self.bd = r, bd
+		self.tx = bd.transacciones.with_options(
+		write_concern=WriteConcern(w="majority"))
+		
+		def evaluar(self, id_emisor, id_receptor, tel_destino, device_id):
+		p = self.r.pipeline()
+		p.sismember("blacklist:users", id_emisor)
+		p.sismember("blacklist:users", id_receptor)
+		p.sismember("blacklist:devices", device_id)
+		p.sismember("blacklist:phones", tel_destino)
+		p.incr(f"velocity:tx:{id_emisor}")
+		p.expire(f"velocity:tx:{id_emisor}", 60, nx=True)
+		p.get(f"risk:score:{id_emisor}")
+		res = p.execute()
+		if any(res[0:4]):
+		return {"decision": "RECHAZADA_FRAUDE", "riesgo": 100,
+			"motivo": "LISTA_NEGRA"}
+		if res[4] > self.LIMITE_VELOCIDAD:
+		return {"decision": "RECHAZADA_FRAUDE", "riesgo": 90,
+			"motivo": "VELOCIDAD"}
+		score = res[6]
+		if score is None:                       # fallo de cache: leer de MongoDB
+		u = self.bd.usuarios.find_one({"_id": ObjectId(id_emisor)},
+		{"score_riesgo": 1})
+		score = u["score_riesgo"] if u else 50
+		self.r.setex(f"risk:score:{id_emisor}", 300, score)
+		riesgo = int(score)
+		return {"decision": "RECHAZADA_FRAUDE" if riesgo >= self.UMBRAL_RECHAZO
+			else "COMPLETADA", "riesgo": riesgo, "motivo": "SCORE"}
+		
+		def autorizar_pago(self, e, rc, monto, canal="APP_ANDROID"):
+		"""e y rc son documentos de usuario (snapshot que entrega el Core de Pagos)."""
+		d = self.evaluar(str(e["_id"]), str(rc["_id"]), rc["telefono_principal"],
+		e["dispositivos"][0]["device_id"])
+		ahora = datetime.now(timezone.utc)
+		self.tx.insert_one({
+			"codigo_transaccion": f"TRX-{ObjectId()}", "monto": monto,
+			"moneda": "BOB", "tipo_operacion": "P2P_QR", "canal": canal,
+			"fecha_hora": ahora, "estado": d["decision"],
+			"riesgo_calculado": d["riesgo"],
+			"geolocalizacion": {"lat": -16.49, "lon": -68.12},
+			"emisor": {"id_usuario": e["_id"], "nombre": e["nombre_completo"],
+				"telefono": e["telefono_principal"],
+				"device_id_origen": e["dispositivos"][0]["device_id"],
+				"score_riesgo_momento": e["score_riesgo"]},
+			"receptor": {"id_usuario": rc["_id"], "nombre": rc["nombre_completo"],
+				"telefono": rc["telefono_principal"]}})
+		if d["decision"] == "COMPLETADA":       # actualiza la proyeccion de grafo
+		self.bd.aristas_flujo.update_one(
+		{"id_emisor": e["_id"], "id_receptor": rc["_id"]},
+		{"$inc": {"monto_acumulado": monto, "cantidad_tx": 1},
+			"$set": {"ultima_fecha": ahora}}, upsert=True)
+		return d
+	\end{lstlisting}
+	
+	\paragraph{ServicioDetectorAnillos.} Implementa las Consultas 3 y 5 del diseño y una variante para reconstruir la ruta entre dos usuarios (Escenario 7).
+	\begin{lstlisting}
+		class ServicioDetectorAnillos:
+		def __init__(self, bd):
+		self.bd = bd
+		
+		def dispositivos_compartidos(self, minimo=3):
+		return list(self.bd.usuarios.aggregate([
+		{"$unwind": "$dispositivos"},
+		{"$group": {"_id": "$dispositivos.device_id",
+				"total_cuentas": {"$sum": 1},
+				"usuarios": {"$push": "$_id"}}},
+		{"$match": {"total_cuentas": {"$gte": minimo}}},
+		{"$sort": {"total_cuentas": -1}}]))
+		
+		def anillos_desde(self, id_usuario, max_depth=3):
+		return list(self.bd.aristas_flujo.aggregate([
+		{"$match": {"id_emisor": id_usuario}},
+		{"$graphLookup": {"from": "aristas_flujo",
+				"startWith": "$id_receptor",
+				"connectFromField": "id_receptor",
+				"connectToField": "id_emisor",
+				"as": "cadena_transferencias",
+				"maxDepth": max_depth,
+				"depthField": "nivel_salto"}},
+		{"$match": {"cadena_transferencias.id_receptor": id_usuario}}]))
+		
+		def ruta_entre(self, id_a, id_b, max_depth=4):
+		return list(self.bd.aristas_flujo.aggregate([
+		{"$match": {"id_emisor": id_a}},
+		{"$graphLookup": {"from": "aristas_flujo",
+				"startWith": "$id_receptor",
+				"connectFromField": "id_receptor",
+				"connectToField": "id_emisor",
+				"as": "cadena", "maxDepth": max_depth,
+				"depthField": "nivel_salto"}},
+		{"$match": {"$or": [{"id_receptor": id_b},
+				{"cadena.id_receptor": id_b}]}},
+		{"$project": {"id_receptor": 1, "cadena.id_emisor": 1,
+				"cadena.id_receptor": 1, "cadena.nivel_salto": 1}}]))
+	\end{lstlisting}
+	
+	\paragraph{ServicioGestorBloqueos.} Al confirmar una alerta actualiza primero MongoDB (fuente de la verdad) y luego publica los identificadores en Redis. Incluye además la rehidratación de las listas negras: como Redis guarda los conjuntos en memoria, tras un reinicio del servidor se reconstruyen a partir de los usuarios bloqueados en MongoDB.
+	\begin{lstlisting}
+		class ServicioGestorBloqueos:
+		def __init__(self, r, bd):
+		self.r, self.bd = r, bd
+		
+		def _publicar(self, u):
+		p = self.r.pipeline()
+		p.sadd("blacklist:users", str(u["_id"]))
+		for d in u["dispositivos"]:
+		p.sadd("blacklist:devices", d["device_id"])
+		for t in u["telefonos"]:
+		p.sadd("blacklist:phones", t)
+		p.execute()
+		
+		def confirmar_alerta(self, id_alerta):
+		al = self.bd.alertas_fraude.find_one_and_update(
+		{"_id": id_alerta, "estado": "PENDIENTE"},
+		{"$set": {"estado": "CONFIRMADO"}})
+		if al is None:
+		return False
+		u = self.bd.usuarios.find_one_and_update(
+		{"_id": al["id_usuario_sospechoso"]},
+		{"$set": {"estado_cuenta": "BLOQUEADA",
+				"dispositivos.$[].es_bloqueado": True}})
+		self._publicar(u)
+		return True
+		
+		def rehidratar(self):
+		n = 0
+		for u in self.bd.usuarios.find({"estado_cuenta": "BLOQUEADA"}):
+		self._publicar(u); n += 1
+		return n
+	\end{lstlisting}
+	
+	\subsection{Ejecución de los escenarios}
+	El script \texttt{demo\_escenarios.py} recorre de extremo a extremo el flujo de la Figura~\ref{fig:secuencia}: un pago normal, la detección del anillo, la confirmación de la alerta y el rechazo del siguiente pago desde el dispositivo bloqueado.
+	\begin{lstlisting}
+		# demo_escenarios.py
+		import redis
+		from datetime import datetime, timezone
+		from pymongo import MongoClient
+		from servicios import (ServicioEvaluadorRiesgo, ServicioDetectorAnillos,
+		ServicioGestorBloqueos)
+		
+		r = redis.Redis(decode_responses=True)
+		bd = MongoClient()["yape_fraude"]
+		ev, det, gest = (ServicioEvaluadorRiesgo(r, bd), ServicioDetectorAnillos(bd),
+		ServicioGestorBloqueos(r, bd))
+		
+		# Escenarios 2 y 3: dispositivos compartidos por 3 o mas cuentas
+		for g in det.dispositivos_compartidos():
+		print("Dispositivo", g["_id"], "->", g["total_cuentas"], "cuentas")
+		tel = bd.usuarios.count_documents({"telefonos": "+59169000000"})
+		print("Cuentas con la linea compartida +59169000000:", tel)
+		
+		# Escenario 1: pago normal (usuarios sin relacion con los anillos)
+		e, rc = bd.usuarios.find().skip(9000).limit(2)
+		print("Pago normal:", ev.autorizar_pago(e, rc, 120.0))
+		
+		# Escenarios 5 y 7: anillo desde un miembro y ruta de dinero
+		miembro = bd.usuarios.find_one({"dispositivos.device_id": "DEV-SHARED-00"})
+		ciclos = det.anillos_desde(miembro["_id"], max_depth=3)
+		print("Ciclos detectados desde el miembro:", len(ciclos))
+		
+		# Escenario 8 + servicio gestor: alerta critica, confirmacion y bloqueo
+		id_alerta = bd.alertas_fraude.insert_one({
+			"id_transaccion": None, "id_usuario_sospechoso": miembro["_id"],
+			"tipo_regla": "ANILLO_CIRCULAR", "nivel_riesgo": "CRITICO",
+			"detalle": "Ciclo de transferencias y dispositivo compartido",
+			"estado": "PENDIENTE",
+			"fecha_deteccion": datetime.now(timezone.utc)}).inserted_id
+		print("Alerta confirmada:", gest.confirmar_alerta(id_alerta))
+		
+		# Escenario 4: otro miembro del anillo usa el mismo dispositivo y es rechazado
+		otro = bd.usuarios.find({"dispositivos.device_id": "DEV-SHARED-00"}).skip(1).next()
+		print("Pago tras el bloqueo:", ev.autorizar_pago(otro, rc, 300.0))
+	\end{lstlisting}
+	
+	\subsection{Instrumentación de rendimiento}
+	El script \texttt{benchmark.py} mide la latencia de la verificación de riesgo (Redis) y de las consultas analíticas (MongoDB) con \texttt{time.perf\_counter}, tras una fase de calentamiento, y reporta mediana, percentiles 95 y 99 y máximo.
+	\begin{lstlisting}
+		# benchmark.py
+		import random, time
+		import redis
+		from pymongo import MongoClient
+		from servicios import ServicioEvaluadorRiesgo, ServicioDetectorAnillos
+		
+		r = redis.Redis(decode_responses=True)
+		bd = MongoClient()["yape_fraude"]
+		ev, det = ServicioEvaluadorRiesgo(r, bd), ServicioDetectorAnillos(bd)
+		ids = [str(u["_id"]) for u in bd.usuarios.find({}, {"_id": 1}).limit(5000)]
+		
+		def medir(f, n, calentamiento=500):
+		for _ in range(calentamiento):
+		f()
+		t = []
+		for _ in range(n):
+		t0 = time.perf_counter(); f()
+		t.append((time.perf_counter() - t0) * 1000)       # milisegundos
+		t.sort()
+		p = lambda q: t[min(len(t) - 1, int(len(t) * q / 100))]
+		return {"n": n, "p50": p(50), "p95": p(95), "p99": p(99), "max": t[-1]}
+		
+		print("Verificacion de riesgo:", medir(
+		lambda: ev.evaluar(random.choice(ids), random.choice(ids),
+		"+59170000000", "DEV-X"), 10_000))
+		
+		miembros = [u["_id"] for u in bd.usuarios.find(
+		{"dispositivos.device_id": {"$regex": "^DEV-SHARED"}}, {"_id": 1})]
+		for d in (1, 2, 3, 4):
+		print(f"graphLookup maxDepth={d}:", medir(
+		lambda: det.anillos_desde(random.choice(miembros), d), 200, 20))
+		print("Dispositivos compartidos:", medir(det.dispositivos_compartidos, 20, 2))
+	\end{lstlisting}
+	
+	Para contrastar el uso de índices se emplean planes de ejecución en \texttt{mongosh}. La sugerencia \texttt{hint(\{\$natural: 1\})} fuerza un recorrido completo de la colección y sirve como línea base sin índice:
+	\begin{lstlisting}
+		db = db.getSiblingDB("yape_fraude");
+		const id = db.usuarios.findOne({ "dispositivos.device_id": "DEV-SHARED-00" })._id;
+		
+		// Con indice (IXSCAN esperado)
+		db.usuarios.find({ "dispositivos.device_id": "DEV-SHARED-00" })
+		.explain("executionStats")
+		// Sin indice (COLLSCAN forzado)
+		db.usuarios.find({ "dispositivos.device_id": "DEV-SHARED-00" })
+		.hint({ $natural: 1 }).explain("executionStats")
+		
+		db.usuarios.find({ telefonos: "+59169000000" }).explain("executionStats")
+		db.transacciones.find({ "emisor.id_usuario": id }).sort({ fecha_hora: -1 })
+		.limit(20).explain("executionStats")
+		db.alertas_fraude.find({ nivel_riesgo: "CRITICO", estado: "PENDIENTE" })
+		.explain("executionStats")
+	\end{lstlisting}
+	De cada plan se registran \texttt{winningPlan.stage}, \texttt{totalKeysExamined}, \texttt{totalDocsExamined} y \texttt{executionTimeMillis}. La latencia de Redis también puede contrastarse de forma independiente con la herramienta incluida en la instalación:
+	\begin{lstlisting}
+		redis-benchmark -n 100000 -q SISMEMBER blacklist:users 650000000000000000000101
+	\end{lstlisting}
+	
+	% =====================================================================
+	\section{Análisis de resultados}
+	Esta sección presenta la forma en que se evalúa el prototipo y el análisis de lo que cada medición demuestra. Los valores que dependen del equipo de ejecución se muestran en rojo entre corchetes y se completan con la salida de los \textit{scripts} de la Sección~6; los valores deterministas (conteos que resultan de la semilla fija del generador) se indican directamente.
+	
+	\subsection{Condiciones de la evaluación}
+	\begin{table}[H]
+		\centering
+		\caption{Condiciones de la evaluación}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{5cm}Y}
+			\toprule
+			\textbf{Parámetro} & \textbf{Valor} \\
+			\midrule
+			Equipo y sistema operativo & \med{modelo de CPU, RAM, SO} \\
+			Versiones de software & MongoDB \med{x.y}, Redis \med{x.y}, Python \med{x.y} \\
+			Usuarios / transacciones / aristas & 10\,000 / $\sim$100\,000 / \med{n.º de aristas} \\
+			Anillos sembrados y cuentas bloqueadas & 5 anillos (19 cuentas) y 20 cuentas bloqueadas \\
+			Semilla del generador & 42 (resultados reproducibles) \\
+			Instancias & Un solo \texttt{mongod} y un solo \texttt{redis-server}, ambos locales \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	\subsection{Verificación funcional de los escenarios}
+	La primera pregunta es si el diseño resuelve los ocho escenarios. Gracias a los casos sembrados, el resultado esperado de cada consulta se conoce de antemano y puede contrastarse con la salida real.
+	
+	\begin{table}[H]
+		\centering
+		\caption{Verificación funcional de los escenarios}
+		\label{tab:verificacion}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{1.2cm}>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{4.4cm}Y}
+			\toprule
+			\textbf{Esc.} & \textbf{Operación} & \textbf{Resultado esperado} & \textbf{Obtenido} \\
+			\midrule
+			1 & Pago de usuario normal & \texttt{COMPLETADA}; se inserta la transacción y se actualiza la arista & \med{ ... } \\
+			2 & Cuentas con la línea \texttt{+59169000000} & 3 cuentas (anillo 0) & \med{ ... } \\
+			3 & Dispositivos con $\geq 3$ cuentas & 5 dispositivos (3, 3, 4, 4 y 5 cuentas) & \med{ ... } \\
+			4 & Pago desde dispositivo o cuenta en lista negra & \texttt{RECHAZADA\_FRAUDE}, motivo \texttt{LISTA\_NEGRA} & \med{ ... } \\
+			5 & \texttt{\$graphLookup} desde un miembro de cada anillo (\texttt{maxDepth}=3) & Se detecta el ciclo en los 5 anillos (el de 5 cuentas requiere profundidad 3) & \med{ ... } \\
+			6 & Sexta transferencia del mismo emisor en 60\,s & \texttt{RECHAZADA\_FRAUDE}, motivo \texttt{VELOCIDAD} & \med{ ... } \\
+			7 & Ruta entre dos miembros de un anillo & Ruta con sus saltos y \texttt{nivel\_salto} & \med{ ... } \\
+			8 & Alerta crítica confirmada & Usuario \texttt{BLOQUEADA}; identificadores en \texttt{blacklist:*}; siguiente pago rechazado & \med{ ... } \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	Un punto de análisis importante es la \textbf{calidad de la detección}. El tráfico normal también contiene ciclos aleatorios de longitud corta: en un grafo dirigido ralo con $d$ contactos por usuario, el número esperado de ciclos de longitud $k$ es del orden de $d^{k}/k$, de modo que con $d=3$ aparecen del orden de decenas de ciclos de longitud 3 a 5 sin que haya fraude. Por eso el ciclo por sí solo es un indicio y no una prueba. El diseño lo resuelve combinando señales independientes: el ciclo (\texttt{\$graphLookup}), la identidad compartida (Consulta 3) y la ventana temporal de las transferencias. En los anillos sembrados las tres señales coinciden, mientras que en un ciclo aleatorio normalmente solo aparece la primera. Se registra en la Tabla~\ref{tab:fp}:
+	
+	\begin{table}[H]
+		\centering
+		\caption{Ciclos detectados y su corroboración con otras señales}
+		\label{tab:fp}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{6cm}YY}
+			\toprule
+			\textbf{Criterio} & \textbf{Anillos sembrados (5)} & \textbf{Otros ciclos} \\
+			\midrule
+			Solo ciclo ($\leq 5$ saltos) & \med{ ... } & \med{ ... } \\
+			Ciclo + dispositivo compartido & \med{ ... } & \med{ ... } \\
+			Ciclo + dispositivo compartido + ventana de 15\,min & \med{ ... } & \med{ ... } \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	\subsection{Verificación en tiempo real con Redis}
+	El requisito crítico es resolver la verificación de lista negra y velocidad en menos de 50\,ms. El \textit{pipeline} de \texttt{evaluar} ejecuta siete comandos, todos de complejidad $O(1)$ ---\texttt{SISMEMBER}, \texttt{INCR}, \texttt{EXPIRE} y \texttt{GET}---, en un solo viaje de red, de modo que el costo no crece con el tamaño de las listas negras.
+	
+	\begin{table}[H]
+		\centering
+		\caption{Latencia de la verificación de riesgo (milisegundos)}
+		\label{tab:lat-redis}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{6.2cm}YYYY}
+			\toprule
+			\textbf{Medición} & \textbf{p50} & \textbf{p95} & \textbf{p99} & \textbf{Máx.} \\
+			\midrule
+			\texttt{evaluar} (10\,000 llamadas, desde Python) & \med{ } & \med{ } & \med{ } & \med{ } \\
+			\texttt{redis-benchmark} \texttt{SISMEMBER} (100\,000) & \med{ } & \med{ } & \med{ } & \med{ } \\
+			Objetivo del caso de estudio & \multicolumn{4}{c}{$<50$ ms (p99)} \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	El criterio de aceptación es que el percentil 99 de \texttt{evaluar} sea inferior a 50\,ms; lo esperable en una conexión local es que el margen sea amplio, pues la latencia queda dominada por el viaje local y la serialización del cliente. Conviene precisar el alcance de esta conclusión: la medición incluye el cliente Python y excluye la red entre la aplicación móvil y el servidor, por lo que valida el presupuesto de latencia del motor, no el de extremo a extremo.
+	
+	Un segundo análisis es la \textbf{carga}. Los 120\,000 registros diarios equivalen a un promedio de $120\,000/86\,400 \approx 1{,}4$ transferencias por segundo. Incluso multiplicando por un factor de 10 para las horas pico, la tasa es muy inferior a la capacidad de un solo nodo de Redis, que se mide en decenas de miles de operaciones por segundo. El desafío del problema no es el rendimiento sostenido, sino la \textbf{latencia de cola} y la profundidad analítica de las consultas de grafo.
+	
+	\subsection{Efecto de los índices en MongoDB}
+	Para cada consulta de la Tabla~\ref{tab:indices} se compara el plan con índice contra el recorrido completo. Sin índice, el número de documentos examinados es igual al tamaño de la colección (10\,000 en \texttt{usuarios} y $\sim$100\,000 en \texttt{transacciones}), por lo que el costo crece linealmente con el histórico; con índice, el costo depende del número de resultados.
+	
+	\begin{table}[H]
+		\centering
+		\caption{Planes de ejecución con y sin índice}
+		\label{tab:explain}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.1cm}>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{2.6cm}Y}
+			\toprule
+			\textbf{Consulta} & \textbf{Sin índice: docs examinados} & \textbf{Sin índice: ms} & \textbf{Con índice: docs examinados} & \textbf{Con índice: ms} \\
+			\midrule
+			Cuentas por \texttt{device\_id} (Esc.\ 3) & 10\,000 & \med{ } & \med{ } & \med{ } \\
+			Cuentas por teléfono (Esc.\ 2) & 10\,000 & \med{ } & \med{ } & \med{ } \\
+			Últimas 20 tx de un usuario (Esc.\ 1) & $\sim$100\,000 & \med{ } & \med{ } & \med{ } \\
+			Alertas críticas pendientes (Esc.\ 6 y 8) & \med{n.º de alertas} & \med{ } & \med{ } & \med{ } \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	Se verifica que \texttt{winningPlan.stage} sea \texttt{IXSCAN} en todas las consultas con índice y que el plan de la consulta del historial no incluya una etapa \texttt{SORT} en memoria: el índice compuesto (\texttt{emisor.id\_usuario}, \texttt{fecha\_hora} descendente) ya entrega los documentos ordenados, que es la utilidad de la regla Igualdad--Orden--Rango. Un caso que merece atención es la Consulta 4, que usa \texttt{\$or} sobre dos campos: MongoDB la resuelve con un plan de dos ramas (una por cada índice compuesto) y debe fusionar y reordenar ambas, lo que es más costoso que una búsqueda por un solo lado.
+	
+	\subsection{Comportamiento de \texttt{\$graphLookup}}
+	La detección de anillos es la operación más costosa. El número de aristas visitadas crece aproximadamente como $d^{p}$, donde $d$ es el número medio de contactos y $p$ la profundidad, por lo que \texttt{maxDepth} controla directamente el costo. Con $d=3$ se esperan unas $3+9+27+81=120$ aristas en profundidad 4, una cifra manejable; con un grafo más denso el crecimiento sería rápido.
+	
+	\begin{table}[H]
+		\centering
+		\caption{Costo de \texttt{\$graphLookup} según la profundidad}
+		\label{tab:graph}
+		\small
+		\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.6cm}YYYY}
+			\toprule
+			\textbf{maxDepth} & \textbf{Aristas visitadas (media)} & \textbf{Anillos hallados (de 5)} & \textbf{p50 (ms)} & \textbf{p95 (ms)} \\
+			\midrule
+			1 & \med{ } & \med{ } & \med{ } & \med{ } \\
+			2 & \med{ } & \med{ } & \med{ } & \med{ } \\
+			3 & \med{ } & \med{ } & \med{ } & \med{ } \\
+			4 & \med{ } & \med{ } & \med{ } & \med{ } \\
+			\bottomrule
+		\end{tabularx}
+	\end{table}
+	
+	Los resultados esperables son dos. Primero, la sensibilidad a la profundidad: un ciclo de $k$ cuentas requiere una profundidad mínima de $k-2$ cuando la búsqueda parte de una de sus aristas, de modo que \texttt{maxDepth}=3 cubre anillos de hasta cinco cuentas y el anillo de mayor tamaño sembrado deja de detectarse con profundidades menores. Segundo, el efecto del índice único (\texttt{id\_emisor}, \texttt{id\_receptor}) de \texttt{aristas\_flujo}, que convierte cada salto recursivo en una búsqueda por índice en lugar de un recorrido de la colección. Se recomienda repetir la medición con \texttt{hint} desactivado para cuantificar esa diferencia.
+	
+	\subsection{Proyección a la escala del negocio}
+	El prototipo trabaja con menos del 1\,\% del volumen real. Para extrapolar se usan las estimaciones de la Tabla~\ref{tab:dimension}: unos 45\,GB para \texttt{transacciones}, 17\,GB para \texttt{aristas\_flujo} y 4,7\,GB para \texttt{usuarios}, es decir, del orden de 67\,GB al año. Tres consideraciones se derivan:
+	\begin{itemize}[leftmargin=2em]
+		\item \textbf{Lo que escala bien:} las operaciones críticas (listas negras y contadores) son $O(1)$ y ocupan decenas de megabytes (500\,000 claves $\times$ 64\,B $\approx$ 30\,MB sin sobrecarga), por lo que el 75\,\% de la carga queda fuera de la base documental y no depende del tamaño del histórico.
+		\item \textbf{Lo que exige cuidado:} la agregación \texttt{\$unwind}/\texttt{\$group} de la Consulta 3 recorre toda la colección \texttt{usuarios} y su costo es lineal en el número de cuentas; a 2,5 millones de cuentas conviene ejecutarla como tarea periódica y materializar su resultado, en lugar de lanzarla bajo demanda. La Consulta 2 (por teléfono) y la 3 por dispositivo concreto sí son puntuales y usan el índice \textit{multikey}.
+		\item \textbf{Memoria de \texttt{\$graphLookup}:} la etapa tiene un límite de memoria por etapa de agregación, así que con grafos muy densos hay que acotar la profundidad, filtrar por fecha o partir de subgrafos sospechosos en lugar de recorrer la red completa.
+	\end{itemize}
+	
+	\subsection{Discusión}
+	Los resultados permiten valorar la hipótesis de la Sección~3 en tres frentes.
+	\begin{enumerate}[leftmargin=2em]
+		\item \textbf{Verificación de riesgo:} la arquitectura políglota separa correctamente la ruta crítica (Redis) de la ruta analítica (MongoDB). Resolver las listas negras en memoria evita que el 75\,\% de las operaciones toque el almacenamiento duradero.
+		\item \textbf{Ingestión inmutable:} la validación de esquema, el índice único de \texttt{codigo\_transaccion} y la escritura con \texttt{w: "majority"} cubren la trazabilidad exigida. En un servidor local de un solo nodo esa garantía de mayoría es trivial; su valor real aparece en una configuración replicada, que no se evaluó en este trabajo.
+		\item \textbf{Detección de anillos:} el modelo precalculado \texttt{aristas\_flujo} reduce el grafo de 100\,000 transacciones a una arista por pareja de cuentas, y \texttt{\$graphLookup} sobre un índice único hace el recorrido viable. Sin embargo, el ciclo aislado produce falsos positivos y debe corroborarse con identidad compartida y ventana temporal.
+	\end{enumerate}
+	
+	Limitaciones del análisis: los datos son sintéticos y el patrón de fraude sembrado es más limpio que uno real; todas las mediciones se hicieron en un único equipo, con un solo cliente y sin carga concurrente, por lo que no se midió el efecto de la contención ni de varios clientes simultáneos; y el puntaje de riesgo es una regla de ejemplo, no un modelo calibrado con datos reales.
+	
+	% =====================================================================
+	\section{Conclusiones y recomendaciones}
+	
+	\subsection{Conclusiones}
+	\begin{itemize}[leftmargin=2em]
+		\item \textbf{Modelado con DDD (Objetivo 1).} DDD permitió ordenar un dominio complejo: se delimitaron cuatro contextos, se identificó como \textit{core} la Prevención y Detección de Fraude y se fijó un lenguaje común para el informe, el esquema y el código. Los cuatro agregados (usuario, transacción, alerta y reporte) se tradujeron de forma directa a documentos de MongoDB, con referencias solo por identificador.
+		\item \textbf{Metodología NoSQL (Objetivo 2).} Las decisiones de embeber o referenciar surgieron del análisis de cardinalidad, frecuencia y crecimiento, no de la intuición: dispositivos y teléfonos se incrustan por ser acotados, y las transacciones se referencian con \textit{snapshot} porque crecen sin límite. El dimensionamiento (aproximadamente 67\,GB anuales a escala real) mostró que el reto del caso es la latencia y el análisis de relaciones, no el volumen de almacenamiento.
+		\item \textbf{Implementación políglota local (Objetivo 3).} Se construyó un prototipo completo que corre en una computadora portátil con instancias locales de MongoDB y Redis, con colecciones validadas por esquema JSON, índices acordes a los escenarios y estructuras de clave-valor con TTL.
+		\item \textbf{Detección de fraude (Objetivo 4).} Las listas negras en conjuntos de Redis resuelven la verificación en $O(1)$, y la proyección \texttt{aristas\_flujo} junto con \texttt{\$graphLookup} permite reconstruir ciclos y rutas de dinero. La detección es más confiable al combinar ciclo, identidad compartida y ventana temporal que al usar el ciclo por sí solo.
+		\item \textbf{Evaluación (Objetivo 5).} Con datos sintéticos de tamaño conocido fue posible verificar la detección contra una verdad de referencia y medir latencias y planes de ejecución (Sección~7). La verificación en tiempo real se evalúa contra el umbral de 50\,ms y la analítica forense contra el crecimiento del costo con la profundidad del grafo.
+		\item \textbf{Alcance.} La solución cumple su propósito como prototipo académico; los resultados no deben extrapolarse automáticamente a producción, ya que no se probó concurrencia, replicación ni datos reales.
+	\end{itemize}
+	
+	\subsection{Recomendaciones}
+	\begin{enumerate}[leftmargin=2em]
+		\item \textbf{Persistencia de Redis y rehidratación.} Activar la persistencia de Redis (\texttt{appendonly yes}) y mantener la rutina \texttt{rehidratar()} que reconstruye las listas negras desde MongoDB, porque MongoDB es la fuente de la verdad y Redis es una copia derivada.
+		\item \textbf{Ventana de velocidad.} Evaluar una ventana deslizante (por ejemplo, con conjuntos ordenados) si la ventana fija de 60\,s permite que un atacante concentre ráfagas en el cambio de ventana.
+		\item \textbf{Reglas combinadas.} No generar alertas críticas a partir de un ciclo aislado: exigir además identidad compartida o una ventana temporal corta, para reducir falsos positivos y la carga de los analistas.
+		\item \textbf{Materialización de la Consulta 3.} Ejecutar la detección masiva de dispositivos compartidos como tarea periódica y guardar su resultado, en lugar de recorrer \texttt{usuarios} bajo demanda.
+		\item \textbf{Control de profundidad.} Fijar \texttt{maxDepth} según el patrón de fraude que se busca, filtrar \texttt{aristas\_flujo} por fecha y partir de cuentas sospechosas para acotar el uso de memoria de \texttt{\$graphLookup}.
+		\item \textbf{Seguridad.} Habilitar el control de acceso de MongoDB y asignar a la aplicación el rol de solo lectura e inserción sobre \texttt{transacciones}, de modo que la inmutabilidad se cumpla por permisos y no solo por convención.
+		\item \textbf{Siguientes pasos.} Probar el sistema con varios clientes concurrentes, evaluar un conjunto de réplicas de un solo nodo para habilitar \textit{Change Streams} y actualizar \texttt{aristas\_flujo} de forma asíncrona, calibrar el puntaje de riesgo con datos reales y, si el análisis de grafos exigiera más profundidad, considerar complementar MongoDB con un motor de grafos especializado.
+	\end{enumerate}
+	
+	% =====================================================================
+	\section{Bibliografía}
+	\begingroup
+	\renewcommand{\section}[2]{}
+	\begin{thebibliography}{99}
+		\bibitem{evans} Evans, E. (2003). \textit{Domain-Driven Design: Tackling Complexity in the Heart of Software}. Addison-Wesley.
+		\bibitem{vernon13} Vernon, V. (2013). \textit{Implementing Domain-Driven Design}. Addison-Wesley.
+		\bibitem{vernon16} Vernon, V. (2016). \textit{Domain-Driven Design Distilled}. Addison-Wesley.
+		\bibitem{sadalage} Sadalage, P. J., y Fowler, M. (2012). \textit{NoSQL Distilled: A Brief Guide to the Emerging World of Polyglot Persistence}. Addison-Wesley.
+		\bibitem{kleppmann} Kleppmann, M. (2017). \textit{Designing Data-Intensive Applications}. O'Reilly Media.
+		\bibitem{bradshaw} Bradshaw, S., Brazil, E., y Chodorow, K. (2019). \textit{MongoDB: The Definitive Guide} (3.\textsuperscript{a} ed.). O'Reilly Media.
+		\bibitem{carlson} Carlson, J. L. (2013). \textit{Redis in Action}. Manning Publications.
+		\bibitem{mongodocs} MongoDB Inc. \textit{MongoDB Manual}: Data Modeling, Aggregation (\texttt{\$graphLookup}, \texttt{\$merge}), Schema Validation, Indexes (regla ESR), Write Concern y Change Streams. \texttt{https://www.mongodb.com/docs/}
+		\bibitem{redisdocs} Redis Ltd. \textit{Redis Documentation}: Sets, \texttt{INCR}, \texttt{EXPIRE} y \texttt{redis-benchmark}. \texttt{https://redis.io/docs/}
+		\bibitem{patrones} Coupal, D., y Alger, K. (2019). \textit{Building with Patterns: A Summary}. MongoDB Blog. \texttt{https://www.mongodb.com/blog}
+	\end{thebibliography}
+	\endgroup
+	
+\end{document}

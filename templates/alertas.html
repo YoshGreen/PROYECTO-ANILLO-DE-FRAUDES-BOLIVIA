@@ -8,7 +8,7 @@
         <h2 class="fw-bold mb-1"><i class="fa-solid fa-bell text-danger me-2"></i>Bandeja de Alertas y Gestión de Bloqueos</h2>
         <p class="text-muted mb-0">Escenario 8: <code>ServicioGestorBloqueos</code> aplica bloqueos en cascada (MongoDB como fuente de la verdad + propagación inmediata a los Sets de Redis).</p>
     </div>
-    <div class="col-md-4 text-md-end mt-3 mt-md-0">
+    <div class="col-md-4 text-md-end mt-3 mt-md-0 d-flex flex-wrap gap-2 justify-content-start justify-content-md-end">
         <button class="btn btn-outline-primary btn-sm" onclick="rehidratarRedis()">
             <i class="fa-solid fa-arrows-rotate me-1"></i> Rehidratar Listas Negras en Redis
         </button>
@@ -38,7 +38,7 @@
             <tbody>
                 {% for al in lista_alertas %}
                 <tr>
-                    <td class="small text-muted">{{ al.fecha_deteccion.strftime('%d/%m/%Y %H:%M:%S') if al.fecha_deteccion else '-' }}</td>
+                    <td class="small text-muted text-nowrap">{{ al.fecha_deteccion.strftime('%d/%m/%Y %H:%M:%S') if al.fecha_deteccion else '-' }}</td>
                     <td>
                         {% if al.nivel_riesgo == 'CRITICO' %}
                             <span class="badge bg-danger">CRÍTICO</span>
@@ -65,13 +65,13 @@
                             <span class="badge bg-secondary">{{ al.estado }}</span>
                         {% endif %}
                     </td>
-                    <td class="text-end">
+                    <td class="text-end text-nowrap">
                         {% if al.estado == 'PENDIENTE' %}
-                            <button class="btn btn-sm btn-danger fw-bold" onclick="confirmarAlerta('{{ al._id }}')">
+                            <button class="btn btn-sm btn-danger fw-bold text-nowrap" onclick="confirmarAlerta('{{ al._id }}')">
                                 <i class="fa-solid fa-gavel me-1"></i> Confirmar y Bloquear
                             </button>
                         {% else %}
-                            <span class="small text-muted"><i class="fa-solid fa-shield-check text-success me-1"></i>Bloqueo activo en Redis</span>
+                            <span class="small text-muted text-nowrap"><i class="fa-solid fa-shield-check text-success me-1"></i>Bloqueo activo en Redis</span>
                         {% endif %}
                     </td>
                 </tr>

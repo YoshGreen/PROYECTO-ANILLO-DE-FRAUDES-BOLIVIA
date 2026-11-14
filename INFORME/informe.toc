@@ -1,0 +1,64 @@
+\babel@toc {spanish}{}\relax 
+\contentsline {section}{\numberline {1}Introducción}{3}{section.1}%
+\contentsline {section}{\numberline {2}Descripción y contexto del caso de estudio}{3}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Dinámica del fraude en el ecosistema Yape}{4}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Perfil de carga y requerimientos de escala}{4}{subsection.2.2}%
+\contentsline {section}{\numberline {3}Planteamiento del problema y objetivos}{4}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Planteamiento del problema}{4}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Objetivos}{5}{subsection.3.2}%
+\contentsline {section}{\numberline {4}Marco teórico}{6}{section.4}%
+\contentsline {subsection}{\numberline {4.1}DDD}{6}{subsection.4.1}%
+\contentsline {subsubsection}{\numberline {4.1.1}Origen y propósito}{6}{subsubsection.4.1.1}%
+\contentsline {subsubsection}{\numberline {4.1.2}Diseño estratégico}{6}{subsubsection.4.1.2}%
+\contentsline {subsubsection}{\numberline {4.1.3}Diseño táctico}{7}{subsubsection.4.1.3}%
+\contentsline {subsubsection}{\numberline {4.1.4}Reglas de los agregados}{7}{subsubsection.4.1.4}%
+\contentsline {subsubsection}{\numberline {4.1.5}DDD y MongoDB}{7}{subsubsection.4.1.5}%
+\contentsline {subsubsection}{\numberline {4.1.6}Proceso seguido en este proyecto}{7}{subsubsection.4.1.6}%
+\contentsline {subsection}{\numberline {4.2}Metodología de modelado de datos NoSQL}{8}{subsection.4.2}%
+\contentsline {subsubsection}{\numberline {4.2.1}Principios del modelado documental}{8}{subsubsection.4.2.1}%
+\contentsline {subsubsection}{\numberline {4.2.2}Fases de la metodología}{9}{subsubsection.4.2.2}%
+\contentsline {subsubsection}{\numberline {4.2.3}Embeber o referenciar}{9}{subsubsection.4.2.3}%
+\contentsline {subsubsection}{\numberline {4.2.4}Patrones de diseño}{10}{subsubsection.4.2.4}%
+\contentsline {subsubsection}{\numberline {4.2.5}Formas (\textit {shapes}) de los documentos}{10}{subsubsection.4.2.5}%
+\contentsline {section}{\numberline {5}Desarrollo}{10}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Mapa de contexto}{10}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Diagrama de dominio}{11}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Diagrama de agregados}{12}{subsection.5.3}%
+\contentsline {paragraph}{A. Escenarios (casos de uso).}{13}{paragraph*.1}%
+\contentsline {paragraph}{B. Registros de producción y estadísticas.}{14}{paragraph*.2}%
+\contentsline {paragraph}{C. Experto en el dominio del negocio (billeteras digitales -- Yape Bolivia).}{14}{paragraph*.3}%
+\contentsline {paragraph}{D. Experto en modelado de datos NoSQL.}{14}{paragraph*.4}%
+\contentsline {paragraph}{A. Carga de trabajo (\textit {workload}).}{15}{paragraph*.5}%
+\contentsline {paragraph}{B. Relaciones (\textit {relationships}).}{16}{paragraph*.6}%
+\contentsline {paragraph}{A. Supuestos.}{16}{paragraph*.7}%
+\contentsline {paragraph}{B. Consultas (\textit {queries}).}{16}{paragraph*.8}%
+\contentsline {paragraph}{C. Índices.}{18}{paragraph*.9}%
+\contentsline {paragraph}{D. Dimensionamiento teórico y entorno de simulación local.}{18}{paragraph*.10}%
+\contentsline {paragraph}{E. Operaciones y carga de trabajo simulada.}{19}{paragraph*.11}%
+\contentsline {paragraph}{G. Campos: definición de colecciones y esquemas.}{19}{paragraph*.12}%
+\contentsline {paragraph}{H. Formas (\textit {shapes}).}{21}{paragraph*.13}%
+\contentsline {subsection}{\numberline {5.4}Diagrama de eventos}{21}{subsection.5.4}%
+\contentsline {subsection}{\numberline {5.5}Diagrama de servicios de dominio}{22}{subsection.5.5}%
+\contentsline {subsection}{\numberline {5.6}Diagrama de escenarios}{22}{subsection.5.6}%
+\contentsline {section}{\numberline {6}Implementación}{23}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Entorno de trabajo}{23}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Creación de la base, las colecciones y los índices}{24}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Generación de datos sintéticos y carga inicial de Redis}{25}{subsection.6.3}%
+\contentsline {subsection}{\numberline {6.4}Servicios de dominio}{27}{subsection.6.4}%
+\contentsline {paragraph}{ServicioEvaluadorRiesgo.}{28}{paragraph*.14}%
+\contentsline {paragraph}{ServicioDetectorAnillos.}{29}{paragraph*.15}%
+\contentsline {paragraph}{ServicioGestorBloqueos.}{30}{paragraph*.16}%
+\contentsline {subsection}{\numberline {6.5}Ejecución de los escenarios}{30}{subsection.6.5}%
+\contentsline {subsection}{\numberline {6.6}Instrumentación de rendimiento}{31}{subsection.6.6}%
+\contentsline {section}{\numberline {7}Análisis de resultados}{32}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Condiciones de la evaluación}{32}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Verificación funcional de los escenarios}{33}{subsection.7.2}%
+\contentsline {subsection}{\numberline {7.3}Verificación en tiempo real con Redis}{33}{subsection.7.3}%
+\contentsline {subsection}{\numberline {7.4}Efecto de los índices en MongoDB}{34}{subsection.7.4}%
+\contentsline {subsection}{\numberline {7.5}Comportamiento de \texttt {\$graphLookup}}{34}{subsection.7.5}%
+\contentsline {subsection}{\numberline {7.6}Proyección a la escala del negocio}{35}{subsection.7.6}%
+\contentsline {subsection}{\numberline {7.7}Discusión}{35}{subsection.7.7}%
+\contentsline {section}{\numberline {8}Conclusiones y recomendaciones}{36}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Conclusiones}{36}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Recomendaciones}{36}{subsection.8.2}%
+\contentsline {section}{\numberline {9}Bibliografía}{37}{section.9}%

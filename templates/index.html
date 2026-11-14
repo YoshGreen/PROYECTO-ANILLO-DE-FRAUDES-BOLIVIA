@@ -8,8 +8,8 @@
         <h2 class="fw-bold mb-1"><i class="fa-solid fa-gauge-high text-primary me-2"></i>Centro de Control Antifraude</h2>
         <p class="text-muted mb-0">Arquitectura NoSQL políglota: MongoDB (consistencia y grafos) + Redis (evaluación de latencia sub-50ms).</p>
     </div>
-    <div class="col-md-4 text-md-end mt-3 mt-md-0">
-        <button class="btn btn-outline-primary btn-sm me-2" onclick="rehidratarRedis()">
+    <div class="col-md-4 text-md-end mt-3 mt-md-0 d-flex flex-wrap gap-2 justify-content-start justify-content-md-end">
+        <button class="btn btn-outline-primary btn-sm" onclick="rehidratarRedis()">
             <i class="fa-solid fa-arrows-rotate me-1"></i> Rehidratar Redis
         </button>
         <a href="{{ url_for('transferir') }}" class="btn btn-yape btn-sm">
@@ -90,24 +90,24 @@
             
             <div class="row text-center g-2 mt-2">
                 <div class="col-4">
-                    <div class="p-3 bg-light rounded-3 border">
-                        <small class="text-muted d-block text-uppercase fw-bold">Usuarios</small>
+                    <div class="p-2 p-md-3 bg-light rounded-3 border h-100">
+                        <small class="text-muted d-block text-uppercase fw-bold text-truncate" title="Usuarios">Usuarios</small>
                         <h4 class="fw-bold text-dark my-1">{{ redis_users }}</h4>
-                        <code class="small text-muted">blacklist:users</code>
+                        <code class="small text-muted d-block text-break">blacklist:users</code>
                     </div>
                 </div>
                 <div class="col-4">
-                    <div class="p-3 bg-light rounded-3 border">
-                        <small class="text-muted d-block text-uppercase fw-bold">Dispositivos</small>
+                    <div class="p-2 p-md-3 bg-light rounded-3 border h-100">
+                        <small class="text-muted d-block text-uppercase fw-bold text-truncate" title="Dispositivos">Dispositivos</small>
                         <h4 class="fw-bold text-dark my-1">{{ redis_devices }}</h4>
-                        <code class="small text-muted">blacklist:devices</code>
+                        <code class="small text-muted d-block text-break">blacklist:devices</code>
                     </div>
                 </div>
                 <div class="col-4">
-                    <div class="p-3 bg-light rounded-3 border">
-                        <small class="text-muted d-block text-uppercase fw-bold">Teléfonos</small>
+                    <div class="p-2 p-md-3 bg-light rounded-3 border h-100">
+                        <small class="text-muted d-block text-uppercase fw-bold text-truncate" title="Teléfonos">Teléfonos</small>
                         <h4 class="fw-bold text-dark my-1">{{ redis_phones }}</h4>
-                        <code class="small text-muted">blacklist:phones</code>
+                        <code class="small text-muted d-block text-break">blacklist:phones</code>
                     </div>
                 </div>
             </div>

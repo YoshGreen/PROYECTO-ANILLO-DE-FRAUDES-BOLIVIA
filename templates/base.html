@@ -20,7 +20,7 @@
 
     <!-- Top Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark yape-navbar sticky-top shadow-sm">
-        <div class="container-fluid px-4">
+        <div class="container-fluid px-3 px-md-4">
             <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="{{ url_for('index') }}">
                 <span class="yape-logo-badge"><i class="fa-solid fa-shield-halved"></i></span>
                 <div>
@@ -73,7 +73,7 @@
                 </ul>
 
                 <!-- Status Badges for Local Services -->
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex flex-wrap align-items-center gap-2 pt-3 pt-lg-0 mt-3 mt-lg-0 border-top border-white-50 border-opacity-25 border-top-lg-0">
                     <div class="service-pill" title="MongoDB 8.3 Local: localhost:27017">
                         <span class="status-dot {% if services_status.mongo.ok %}online{% else %}offline{% endif %}"></span>
                         <span class="service-text"><i class="fa-solid fa-leaf text-success me-1"></i>Mongo</span>
@@ -82,7 +82,7 @@
                         <span class="status-dot {% if services_status.redis.ok %}online{% else %}offline{% endif %}"></span>
                         <span class="service-text"><i class="fa-solid fa-bolt text-danger me-1"></i>Redis</span>
                     </div>
-                    <button class="btn btn-sm btn-outline-light rounded-pill px-3 ms-2" data-bs-toggle="modal" data-bs-target="#modalPoblar">
+                    <button class="btn btn-sm btn-outline-light rounded-pill px-3 mt-1 mt-sm-0" data-bs-toggle="modal" data-bs-target="#modalPoblar">
                         <i class="fa-solid fa-arrows-rotate me-1"></i> Sembrar Datos
                     </button>
                 </div>
@@ -91,7 +91,7 @@
     </nav>
 
     <!-- Main Container -->
-    <main class="container-fluid px-4 py-4">
+    <main class="container-fluid px-2 px-sm-3 px-md-4 py-3 py-md-4">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -149,10 +149,12 @@
 
     <!-- Footer -->
     <footer class="footer py-3 bg-white border-top text-center text-muted small mt-5">
-        <div class="container">
-            <span class="fw-bold">Caso de Estudio No. 2 - Base de Datos III</span> | 
-            <span>Universidad Mayor de San Andrés (UMSA)</span> | 
-            <span>Dupla: Yoshua Cordova & Erick Serpemtegui (2026)</span>
+        <div class="container d-flex flex-column flex-sm-row justify-content-center align-items-center gap-1 gap-sm-2">
+            <span class="fw-bold">Caso de Estudio No. 2 - Base de Datos III</span>
+            <span class="d-none d-sm-inline">&bull;</span>
+            <span>UMSA</span>
+            <span class="d-none d-sm-inline">&bull;</span>
+            <span>Dupla: Yoshua Cordova &amp; Erick Serpemtegui</span>
         </div>
     </footer>
 
